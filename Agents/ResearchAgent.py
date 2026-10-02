@@ -2,28 +2,29 @@ import requests
 from bs4 import BeautifulSoup
 
 
-
-
 class ResearchAgent:
+    # get link -> extract link from RSS feed
+    def __init__(self):
+        pass
 
-    _url_rss = None
-    _link = None
+    def GetLink(self, urlRss):
+        response = requests.get(urlRss)
 
-    def __init__(self,url,link):
-        self._url_rss = url
-        self._link = link
+        soup = BeautifulSoup(response.text, "xml")
 
-    def search(self):
-        response = requests.get(self._url_rss)
-        #extract link
-        soup = BeautifulSoup(response.text, "html.parser")
-        articles = soup.find("item")
-        if articles:
-            link = articles.find("link").get_text()
-        return link
+        article = soup.find("item")
 
-    def VnexpressExtractor(self):
-        response = requests.get(self._url_rss)
+        if article:
+            link = article.find("link")
+
+            if link:
+                return link.get_text(strip=True)
+
+        return None
+
+    def VnexpressExtractor(self,link):
+
+        response = requests.get(link,timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
         article = soup.find("article", class_="fck_detail")
@@ -32,7 +33,10 @@ class ResearchAgent:
 
         description = article.find("p", class_="description")
 
-        paragraphs = article.find_all("p", class_="Normal")
+        paragraphs = (
+            article.find_all("p", class_="Normal")
+            if article else []
+        )
 
         return {
             "title": title.get_text(" ", strip=True) if title else "",
@@ -42,3 +46,11 @@ class ResearchAgent:
                 for p in paragraphs
             )
         }
+
+    def Search(self, urlRss):
+        link = self.GetLink(urlRss)
+
+        if not link:
+            return None
+
+        return self.VnexpressExtractor(link)

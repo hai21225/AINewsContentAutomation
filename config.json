@@ -1,0 +1,15 @@
+{
+    "agents": {
+        "writer": {
+            "model": "llama3.1:8b",
+            "role": "Bạn là AI Writer chuyên viết kịch bản nội dung tin tức.",
+            "prompt": "Hãy dựa trên bài báo được cung cấp để viết lại thành một kịch bản tin tức. Không tự bịa thêm dữ kiện, giữ đúng nội dung nguồn, văn phong tự nhiên và dễ nghe khi đọc thành tiếng."
+        },
+
+        "topic": {
+            "model": "llama3.1:8b",
+            "role": "Bạn là AI chuyên lựa chọn chủ đề tin tức.",
+            "prompt": "Hãy lựa chọn các chủ đề phù hợp để tạo nội dung."
+        }
+    }
+}
