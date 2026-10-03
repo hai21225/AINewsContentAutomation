@@ -1,9 +1,10 @@
-class BaseAgent:
-    _name = "llama3.1:8b"
-    _role = "default role"
 
-    def __init__(self, name , role):
-        self._name = name
+
+
+class BaseAgent:
+
+    def __init__(self, llmClient , role):
+        self._llmClient=llmClient
         self._role = role
 
     def build_prompt(self, task):
@@ -16,6 +17,10 @@ Nhiệm vụ hiện tại:
 
 Hãy thực hiện nhiệm vụ.
 """
+
+    def generate(self, task, outputFormat):
+        prompt = self.build_prompt(task)
+        return self._llmClient.generate(prompt, outputFormat)
 
     def run(self, task):
         raise NotImplementedError("Subclass must implement run()")

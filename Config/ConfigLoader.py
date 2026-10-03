@@ -23,3 +23,6 @@ class ConfigLoader:
 
     def GetRssConfig(self):
         return self._config["rss"]
+
+    def GetLlmConfig(self):
+        return self._config["llm"]

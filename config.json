@@ -1,15 +1,45 @@
 {
+    "llm": {
+        "provider": "ollama",
+        "base_url": "http://localhost:11434",
+        "model": "llama3.1:8b",
+        "options": {
+            "num_predict": -1,
+            "temperature": 0.2
+        }
+    },
+
+    "rss": {
+        "khoa_hoc_cong_nghe": "https://vnexpress.net/rss/khoa-hoc-cong-nghe.rss",
+        "giai_tri": "https://vnexpress.net/rss/giai-tri.rss",
+        "the_thao": "https://vnexpress.net/rss/the-thao.rss",
+        "giao_duc": "https://vnexpress.net/rss/giao-duc.rss",
+        "thoi_su": "https://vnexpress.net/rss/thoi-su.rss",
+        "kinh_doanh": "https://vnexpress.net/rss/kinh-doanh.rss",
+        "suc_khoe": "https://vnexpress.net/rss/suc-khoe.rss",
+        "gia_dinh": "https://vnexpress.net/rss/gia-dinh.rss",
+        "phap_luat": "https://vnexpress.net/rss/phap-luat.rss",
+        "oto_xe_may": "https://vnexpress.net/rss/oto-xe-may.rss"
+    },
+
     "agents": {
         "writer": {
-            "model": "llama3.1:8b",
-            "role": "Bạn là AI Writer chuyên viết kịch bản nội dung tin tức.",
-            "prompt": "Hãy dựa trên bài báo được cung cấp để viết lại thành một kịch bản tin tức. Không tự bịa thêm dữ kiện, giữ đúng nội dung nguồn, văn phong tự nhiên và dễ nghe khi đọc thành tiếng."
+            "role": "Bạn là biên tập viên chuyên chuyển bài báo thành nội dung tin tức ngắn, rõ ràng và phù hợp để đọc bằng Text-to-Speech.",
+            "prompt": "Hãy viết lại bài báo nguồn thành một bản tin tiếng Việt dùng cho Text-to-Speech.",
+            "min_word": 160,
+            "max_word": 220,
+            "max_retries": 3
         },
 
         "topic": {
-            "model": "llama3.1:8b",
-            "role": "Bạn là AI chuyên lựa chọn chủ đề tin tức.",
-            "prompt": "Hãy lựa chọn các chủ đề phù hợp để tạo nội dung."
+            "role": "Bạn là AI biên tập viên chuyên lựa chọn tin tức phù hợp để tạo video ngắn.",
+            "prompt": "Đánh giá các bài báo được cung cấp và lựa chọn những tin có nội dung đáng chú ý, dễ hiểu và phù hợp để tạo video tin tức ngắn. Ưu tiên các tin có sự kiện rõ ràng, thông tin mới, nhân vật hoặc sự việc nổi bật và có đủ dữ kiện để tóm tắt. Không tự thêm thông tin ngoài dữ liệu được cung cấp."
         }
+    },
+
+
+    "tts": {
+        "voice": "vi-VN-Standard-A"
     }
+    
 }
