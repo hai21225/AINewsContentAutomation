@@ -1,11 +1,54 @@
 {
     "llm": {
-        "provider": "ollama",
-        "base_url": "http://localhost:11434",
-        "model": "llama3.1:8b",
-        "options": {
-            "num_predict": -1,
-            "temperature": 0.2
+        "providers": {
+            "gemini": {
+                "type": "gemini",
+                "api_key_env": "GEMINI_API_KEY"
+            },
+
+            "ollama": {
+                "type": "ollama",
+                "base_url": "http://localhost:11434"
+            },
+
+            "openai": {
+                "type": "openai",
+                "api_key_env": "OPENAI_API_KEY"
+            }
+        },
+
+        "models": {
+            "gemini_3.5_flash_lite": {
+                "provider": "gemini",
+                "model": "gemini-3.5-flash-lite",
+                "options": {
+                    "temperature": 0.2
+                }
+            },
+
+            "gemini_3.1_flash_lite": {
+                "provider": "gemini",
+                "model": "gemini-3.1-flash-lite",
+                "options": {
+                    "temperature": 0.2
+                }
+            },
+            "gemini_3.8_flash": {
+                "provider": "gemini",
+                "model": "gemini-3.8-flash",
+                "options": {
+                    "temperature": 0.2
+                }
+            },
+
+            "ollama_local_8b": {
+                "provider": "ollama",
+                "model": "llama3.1:8b",
+                "options": {
+                    "temperature": 0.2,
+                    "num_predict": -1
+                }
+            }
         }
     },
 
@@ -24,16 +67,26 @@
 
     "agents": {
         "writer": {
+            "model":"llama3.1:8b",
             "role": "Bạn là biên tập viên chuyên chuyển bài báo thành nội dung tin tức ngắn, rõ ràng và phù hợp để đọc bằng Text-to-Speech.",
             "prompt": "Hãy viết lại bài báo nguồn thành một bản tin tiếng Việt dùng cho Text-to-Speech.",
             "min_word": 160,
             "max_word": 220,
+            "minimum_accepted_word": 140,
+            "maximum_accepted_word": 300,
+            "candidate_count": 3,
             "max_retries": 3
         },
 
         "topic": {
+            "model": "llama3.1:8b",
             "role": "Bạn là AI biên tập viên chuyên lựa chọn tin tức phù hợp để tạo video ngắn.",
             "prompt": "Đánh giá các bài báo được cung cấp và lựa chọn những tin có nội dung đáng chú ý, dễ hiểu và phù hợp để tạo video tin tức ngắn. Ưu tiên các tin có sự kiện rõ ràng, thông tin mới, nhân vật hoặc sự việc nổi bật và có đủ dữ kiện để tóm tắt. Không tự thêm thông tin ngoài dữ liệu được cung cấp."
+        },
+        "checker": {
+            "model": "llama3.1:8b",
+            "role": "Bạn là AI kiểm tra nội dung tin tức, đảm bảo tính chính xác và độ tin cậy của thông tin.",
+            "prompt": "Kiểm tra tính chính xác và độ tin cậy của nội dung tin tức được cung cấp."
         }
     },
 

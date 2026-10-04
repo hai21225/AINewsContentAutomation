@@ -9,14 +9,14 @@ class BaseAgent:
 
     def build_prompt(self, task):
         return f"""
-Vai trò của bạn:
-{self._role}
+            Vai trò của bạn:
+            {self._role}
 
-Nhiệm vụ hiện tại:
-{task}
+            Nhiệm vụ hiện tại:
+            {task}
 
-Hãy thực hiện nhiệm vụ.
-"""
+            Hãy thực hiện nhiệm vụ.
+            """
 
     def generate(self, task, outputFormat):
         prompt = self.build_prompt(task)

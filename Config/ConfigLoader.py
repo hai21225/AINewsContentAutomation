@@ -1,28 +1,37 @@
 import json
+from pathlib import Path
 
 
 class ConfigLoader:
 
-    def __init__(self, configPath):
-        self._configPath = configPath
-        self._config = None
+    def __init__(self, config_dir="config"):
+        self._config_dir = Path(config_dir)
 
-        self.Load()
+    def _load_json(self, path):
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
 
-    def Load(self):
-        with open(
-            self._configPath,
-            "r",
-            encoding="utf-8"
-        ) as file:
+    def get_providers(self):
+        return self._load_json(
+            self._config_dir / "llm" / "providers.json"
+        )
 
-            self._config = json.load(file)
+    def get_models(self):
+        return self._load_json(
+            self._config_dir / "llm" / "models.json"
+        )
 
-    def GetAgentConfig(self, agentName):
-        return self._config["agents"][agentName]
+    def get_agent(self, agent_name):
+        return self._load_json(
+            self._config_dir / "agents" / f"{agent_name}.json"
+        )
 
-    def GetRssConfig(self):
-        return self._config["rss"]
+    def get_rss(self):
+        return self._load_json(
+            self._config_dir / "rss.json"
+        )
 
-    def GetLlmConfig(self):
-        return self._config["llm"]
+    def get_tts(self):
+        return self._load_json(
+            self._config_dir / "tts.json"
+        )

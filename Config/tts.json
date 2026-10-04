@@ -1,0 +1,13 @@
+{
+    "provider": "edge_tts",
+
+    "providers": {
+        "edge_tts": {
+            "voice": "vi-VN-HoaiMyNeural"
+        },
+
+        "google": {
+            "voice": "vi-VN-Standard-A"
+        }
+    }
+}

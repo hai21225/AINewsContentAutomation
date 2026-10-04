@@ -18,12 +18,13 @@ class ResearchAgent:
             link = article.find("link")
 
             if link:
+                print(f"Đã tìm thấy link: {link.get_text(strip=True)}")
                 return link.get_text(strip=True)
 
         return None
 
     def VnexpressExtractor(self,link):
-
+        print(f"Đang trích xuất nội dung từ: {link}")
         response = requests.get(link,timeout=10)
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -37,7 +38,7 @@ class ResearchAgent:
             article.find_all("p", class_="Normal")
             if article else []
         )
-
+        
         return {
             "title": title.get_text(" ", strip=True) if title else "",
             "description": description.get_text(" ", strip=True) if description else "",

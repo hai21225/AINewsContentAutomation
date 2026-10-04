@@ -1,0 +1,12 @@
+{
+    "model": "gemini_3.1_flash_lite",
+
+    "role": "Bạn là AI kiểm tra nội dung tin tức.",
+
+    "prompt": "So sánh nội dung được tạo với bài báo nguồn. Kiểm tra sai dữ kiện, thiếu thông tin quan trọng, số liệu không chính xác và các phát biểu không được nguồn hỗ trợ.",
+
+    "minimum_score": 8.0,
+    "max_retries": 2,
+
+    "escalation_model": "gemini_3.8_flash"
+}

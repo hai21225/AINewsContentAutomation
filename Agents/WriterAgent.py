@@ -32,6 +32,9 @@ class WriterAgent(BaseAgent):
         self._minWords = config["min_word"]
         self._maxWords = config["max_word"]
         self._maxRetries = config["max_retries"]
+        self._candidateCount = config.get("candidate_count", 3)
+        self._minimumAcceptedWords = config.get("minimum_accepted_word", self._minWords)
+        self._maximumAcceptedWords = config.get("maximum_accepted_word", self._maxWords)
         super().__init__(
             self._llmClient,
             self._role
@@ -41,8 +44,9 @@ class WriterAgent(BaseAgent):
 
     def _count_words(self, text):
         return len(text.split())
-    
+
     def run(self, article):
+        print ("Đang tiến hành tóm tắt bài báo...")
         title = article["title"]
         description = article["description"]
         content = article["content"]
@@ -51,7 +55,7 @@ class WriterAgent(BaseAgent):
             {self._writerPrompt}
 
             YÊU CẦU BẮT BUỘC:
-            - Bắt buộc tts_text từ {self._minWords} đến {self._maxWords} từ (khoảng 1 phút đọc).
+            - Mục tiêu tts_text từ {self._minWords} đến {self._maxWords} từ (khoảng 1 phút đọc).
             - Chỉ sử dụng thông tin có trong bài báo nguồn.
             - Không tự thêm dữ kiện, suy đoán hoặc nhận xét.
             - Không đặt hashtag trong tts_text.
@@ -70,13 +74,11 @@ class WriterAgent(BaseAgent):
             {content}
             """
 
-        task = base_task
-
         attempt_results = []
-        for attempt in range(self._maxRetries):
+        for attempt in range(self._candidateCount):
 
             result = self.generate(
-                task,
+                base_task,
                 outputFormat=WRITER_OUTPUT_FORMAT
             )
 
@@ -85,104 +87,109 @@ class WriterAgent(BaseAgent):
             tts_text = resultjson["tts_text"].strip()
             word_count = self._count_words(tts_text)
 
-            print(f"Attempt {attempt + 1}: {word_count} từ")
+            print(f"Lần thứ {attempt + 1} sinh ra: {word_count} từ")
 
-            attempt_results.append({
-                "resultjson": resultjson,
-                "tts_text": tts_text,
-                "word_count": word_count
-            })
+            candidate = self._prepare_result(resultjson, title, tts_text)
+            candidate["word_count"] = word_count
+            candidate["candidate_id"] = attempt
+            candidate["validation_errors"] = self._decision(candidate)
 
-            if self._maxWords >= word_count >= self._minWords:
-                return self._prepare_result(resultjson, title, tts_text)
+            if len(candidate["validation_errors"]) == 0:
+                attempt_results.append(candidate)
+                print(f"Ứng viên {attempt + 1} hợp lệ để Checker đánh giá.")
+            else:
+                print(f"Ứng viên {attempt + 1} bị loại:")
+                print(candidate["validation_errors"])
 
-            # Retry nhưng vẫn giữ bài báo nguồn
-            if word_count < self._minWords:
-                task = f"""
-                    {base_task}
-
-                    KẾT QUẢ LẦN TRƯỚC:
-
-                    {tts_text}
-
-                    Kết quả trên có {word_count} từ nên chưa đạt yêu cầu {self._minWords} đến {self._maxWords} từ.
-
-                    Hãy viết lại toàn bộ JSON.
-
-                    Đặc biệt:
-                    - Bắt buộc tts_text từ {self._minWords} đến {self._maxWords} từ.
-                    - Nếu quá ngắn, hãy khai thác thêm các thông tin có sẵn trong bài báo nguồn.
-                    - Không được thêm thông tin không có trong nguồn.
-                    """
-            elif word_count > self._maxWords:
-                task = f"""
-                    {base_task}
-
-                    KẾT QUẢ LẦN TRƯỚC:
-
-                    {tts_text}
-
-                    Kết quả trên có {word_count} từ nên đã vượt quá yêu cầu {self._minWords} đến {self._maxWords} từ.
-
-                    Hãy viết lại toàn bộ JSON.
-
-                    Đặc biệt:
-                    - Bắt buộc tts_text từ {self._minWords} đến {self._maxWords} từ.
-                    - Nếu quá dài, hãy rút gọn nội dung, giữ lại các thông tin quan trọng.
-                    - Không được thêm thông tin không có trong nguồn.
-                    """
-
-
-
-        best = self._decision(attempt_results)
-
-        return self._prepare_result(
-            best["resultjson"],
-            title,
-            best["tts_text"]
-        )
+        return {
+            "candidates": attempt_results,
+            "article_title": title,
+            "writer_attempt_count": self._candidateCount
+        }
 
         # raise ValueError(
         #     f"WriterAgent không tạo được tts_text "
         #     f"{self.MIN_WORDS}-{self.MAX_WORDS} từ "
         #     f"sau {self.MAX_RETRIES} lần thử."
         # )
-    
+
 
 
     def _decision(self, attempts):
+        errors = []
 
-        bestAttempt = None
-        bestDistance =None
-        distance = 0
+        if "tts_text" not in attempts:
+            errors.append("Thiếu trường tts_text.")
+        else:
+            if attempts["tts_text"] == "":
+                errors.append("tts_text đang rỗng.")
 
-        for attempt in attempts:
-            wordCount = attempt["word_count"]
+            if "#" in attempts["tts_text"]:
+                errors.append("tts_text không được chứa hashtag.")
 
-            if wordCount < self._minWords:
-                distance = self._minWords - wordCount
+        if "hashtags" not in attempts:
+            errors.append("Thiếu trường hashtags.")
+        else:
+            if len(attempts["hashtags"]) < 3:
+                errors.append("Phải có ít nhất 3 hashtag.")
+            if len(attempts["hashtags"]) > 5:
+                errors.append("Không được có quá 5 hashtag.")
 
-            elif wordCount > self._maxWords:
-                distance = wordCount - self._maxWords
-            else:
-                distance = 0
+        word_count = attempts["word_count"]
+        if word_count < self._minimumAcceptedWords:
+            errors.append(
+                f"Nội dung quá ngắn: {word_count} từ, tối thiểu chấp nhận là {self._minimumAcceptedWords} từ."
+            )
+        if word_count > self._maximumAcceptedWords:
+            errors.append(
+                f"Nội dung quá dài: {word_count} từ, tối đa chấp nhận là {self._maximumAcceptedWords} từ."
+            )
 
-            if bestDistance is None:
-                bestDistance = distance
-                bestAttempt = attempt
-
-            elif distance < bestDistance:
-                bestDistance = distance
-                bestAttempt = attempt
-
-        return bestAttempt
+        return errors
 
     def _prepare_result(self, resultjson, title, tts_text):
+
         resultjson["tts_text"] = tts_text
         resultjson["title"] = title
-        resultjson["hashtags"] = [
-            hashtag.strip()
-            for hashtag in resultjson["hashtags"]
-        ]
+        cleaned_hashtags = []
+
+        for hashtag in resultjson["hashtags"]:
+            cleaned_hashtag = hashtag.strip()
+            cleaned_hashtags.append(cleaned_hashtag)
+
+        resultjson["hashtags"] = cleaned_hashtags
 
         return resultjson
+    
+
+    def revise(self, article, previousResult, feedback):
+        print("Đang yêu cầu chỉnh sửa...")
+        task = f"""
+        {self._writerPrompt}
+
+        BÀI BÁO NGUỒN:
+
+        {article["content"]}
+
+        BẢN TRƯỚC:
+
+        {previousResult["tts_text"]}
+
+        PHẢN HỒI TỪ CHECKER:
+
+        {feedback["revision_instruction"]}
+
+        Hãy sửa lại nội dung dựa trên phản hồi trên.
+
+        Không được sửa những phần đang đúng nếu không cần thiết.
+        Không được thêm thông tin ngoài bài báo nguồn.
+
+        Mục tiêu tts_text từ {self._minWords} đến {self._maxWords} từ.
+        """
+
+        result = self.generate(
+            task,
+            outputFormat=WRITER_OUTPUT_FORMAT
+        )
+
+        return json.loads(result)
