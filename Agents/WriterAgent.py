@@ -48,7 +48,7 @@ class WriterAgent(BaseAgent):
     def run(self, article):
         print ("Đang tiến hành tóm tắt bài báo...")
         title = article["title"]
-        description = article["description"]
+        description = article.get("des", article.get("description", ""))
         content = article["content"]
 
         base_task = f"""
@@ -106,13 +106,6 @@ class WriterAgent(BaseAgent):
             "article_title": title,
             "writer_attempt_count": self._candidateCount
         }
-
-        # raise ValueError(
-        #     f"WriterAgent không tạo được tts_text "
-        #     f"{self.MIN_WORDS}-{self.MAX_WORDS} từ "
-        #     f"sau {self.MAX_RETRIES} lần thử."
-        # )
-
 
 
     def _decision(self, attempts):

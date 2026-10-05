@@ -63,7 +63,7 @@ class CheckerAgent(BaseAgent):
         {article["title"]}
 
         Mô tả:
-        {article["description"]}
+        {article.get("des", article.get("description", ""))}
 
         Nội dung:
         {article["content"]}

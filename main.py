@@ -1,13 +1,16 @@
-from Agents.ResearchAgent import ResearchAgent
+import json
+from Agents.Workflow import Workflow
 from Agents.WriterAgent import WriterAgent
 from Agents.CheckerAgent import CheckerAgent
-from Agents.SuperVisorAgent import SuperVisorAgent
+from Agents.WriterSuperVisor import WriterSuperVisor
+from Agents.SelectorAgent import SelectorAgent
+from Services.ResearchService import ResearchService
+from Services.TtsService import TtsService
 
 from Config.ConfigLoader import ConfigLoader
 from LLM.AiClientFactory import AiClientFactory
 
 from dotenv import load_dotenv
-
 load_dotenv()
 
 config_loader = ConfigLoader()
@@ -22,6 +25,8 @@ rss_config = config_loader.get_rss()
 
 writer_config = config_loader.get_agent("writer")
 checker_config = config_loader.get_agent("checker")
+selector_config = config_loader.get_agent("selector")
+tts_config = config_loader.get_tts()
 
 
 # =========================
@@ -59,12 +64,26 @@ checker_llm_client = AiClientFactory.create(
     checker_model_config
 )
 
+# =========================
+# CREATE SELECTOR CLIENT
+# =========================
+
+selector_model_name = selector_config["model"]
+selector_model_config = models[selector_model_name]
+selector_provider_name = selector_model_config["provider"]
+selector_provider_config = providers[selector_provider_name]
+
+selector_llm_client = AiClientFactory.create(
+    selector_provider_config,
+    selector_model_config
+)
+
 
 # =========================
 # CREATE AGENTS
 # =========================
 
-research_agent = ResearchAgent()
+research_service = ResearchService()
 
 writer_agent = WriterAgent(
     writer_config,
@@ -76,38 +95,67 @@ checker_agent = CheckerAgent(
     checker_llm_client
 )
 
-supervisor_agent = SuperVisorAgent(
+selector_agent = SelectorAgent(
+    selector_config,
+    selector_llm_client
+)
+
+tts_service = TtsService(tts_config)
+
+supervisor_agent = WriterSuperVisor(
     writer_agent,
     checker_agent
 )
 
 
+
+workflow = Workflow(
+    research_service,
+    selector_agent,
+    supervisor_agent,
+    ttsService=tts_service
+)
+
+print(workflow.run(rss_config))
+
 # =========================
 # TEST
 # =========================
 
-article = research_agent.Search(
-    rss_config["thoi_su"]
-)
+# articles = research_service.SearchAll(rss_config)
+# selected = selector_agent.run(articles)
 
-result = supervisor_agent.run(article)
+# selected_ids = {item["id"] for item in selected}
+# selected_articles = [
+#     article for article in articles if article["id"] in selected_ids
+# ]
+
+# print("\n========== SELECTED ARTICLES ==========")
+# print(json.dumps(selected, ensure_ascii=False, indent=2))
+
+# if not selected_articles:
+#     raise ValueError("SelectorAgent không chọn được bài báo nào.")
+
+# article = selected_articles[0]
+
+# result = supervisor_agent.run(article)
 
 
-# =========================
-# OUTPUT
-# =========================
+# # =========================
+# # OUTPUT
+# # =========================
 
-print("\n========== RESULT ==========\n")
+# print("\n========== RESULT ==========\n")
 
-print("Title:")
-print(result["title"])
+# print("Title:")
+# print(result["title"])
 
-print("\nTTS:")
-print(result["tts_text"])
+# print("\nTTS:")
+# print(result["tts_text"])
 
-print("\nHashtags:")
-print(result["hashtags"])
+# print("\nHashtags:")
+# print(result["hashtags"])
 
-word_count = len(result["tts_text"].split())
+# word_count = len(result["tts_text"].split())
 
-print("\nSố từ:", word_count)
+# print("\nSố từ:", word_count)

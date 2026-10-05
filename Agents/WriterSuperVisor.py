@@ -1,6 +1,6 @@
 
 
-class SuperVisorAgent():
+class WriterSuperVisor():
 
     def __init__(self, writerAgent, checkerAgent, maxRetries=3):
         self.writerAgent = writerAgent
@@ -48,7 +48,11 @@ class SuperVisorAgent():
                 f"Vòng kiểm tra {attempt + 1}: "
                 f"điểm cao nhất là {current_best_check['score']}/10."
             )
-
+            if (
+                current_best_check["passed"]
+                and current_best_check["score"] >= 8
+            ):
+                break
             if attempt == self.maxRetries:
                 break
 

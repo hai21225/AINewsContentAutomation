@@ -23,6 +23,14 @@
         }
     },
 
+    "gemma_4_31b": {
+        "provider": "gemini",
+        "model": "gemma-4-31b-it",
+        "options": {
+            "temperature": 0.2
+        }
+    },
+
     "ollama_local_8b": {
         "provider": "ollama",
         "model": "llama3.1:8b",

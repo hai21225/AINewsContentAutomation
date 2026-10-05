@@ -3,7 +3,10 @@
 
     "providers": {
         "edge_tts": {
-            "voice": "vi-VN-HoaiMyNeural"
+            "voice": "vi-VN-HoaiMyNeural",
+            "rate": "+0%",
+            "pitch": "+0Hz",
+            "volume": "+0%"
         },
 
         "google": {
