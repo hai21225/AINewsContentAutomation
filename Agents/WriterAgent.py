@@ -1,6 +1,8 @@
 import json
 
 from Agents.BaseAgent import BaseAgent
+from Console import Console
+
 
 WRITER_OUTPUT_FORMAT = {
     "type": "object",
@@ -46,7 +48,7 @@ class WriterAgent(BaseAgent):
         return len(text.split())
 
     def run(self, article):
-        print ("Đang tiến hành tóm tắt bài báo...")
+        Console.loading("Đang tiến hành tóm tắt bài báo")
         title = article["title"]
         description = article.get("des", article.get("description", ""))
         content = article["content"]
@@ -75,6 +77,7 @@ class WriterAgent(BaseAgent):
             """
 
         attempt_results = []
+        Console.success("đã tạo xong prompt")
         for attempt in range(self._candidateCount):
 
             result = self.generate(
@@ -87,7 +90,7 @@ class WriterAgent(BaseAgent):
             tts_text = resultjson["tts_text"].strip()
             word_count = self._count_words(tts_text)
 
-            print(f"Lần thứ {attempt + 1} sinh ra: {word_count} từ")
+            Console.success(f"Lần thứ {attempt + 1} sinh ra: {word_count} từ")
 
             candidate = self._prepare_result(resultjson, title, tts_text)
             candidate["word_count"] = word_count
@@ -96,10 +99,10 @@ class WriterAgent(BaseAgent):
 
             if len(candidate["validation_errors"]) == 0:
                 attempt_results.append(candidate)
-                print(f"Ứng viên {attempt + 1} hợp lệ để Checker đánh giá.")
+                Console.success(f"Ứng viên {attempt + 1} hợp lệ để Checker đánh giá.")
             else:
-                print(f"Ứng viên {attempt + 1} bị loại:")
-                print(candidate["validation_errors"])
+                Console.error(f"Ứng viên {attempt + 1} bị loại:")
+                Console.error(candidate["validation_errors"])
 
         return {
             "candidates": attempt_results,

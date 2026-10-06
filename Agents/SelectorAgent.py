@@ -36,15 +36,15 @@ class SelectorAgent(BaseAgent):
             for a in articles
         ]
         task = f"""
-        {self._prompt}
+            {self._prompt}
 
-        Chọn đúng {self._articleCount} bài. Chỉ được chọn id có trong danh sách.
-        Trả về reason ngắn gọn bằng tiếng Việt cho từng bài.
-        Không trả về title, des, content hoặc bất kỳ trường nào khác.
+            Chọn đúng {self._articleCount} bài. Chỉ được chọn id có trong danh sách.
+            Trả về reason ngắn gọn bằng tiếng Việt cho từng bài.
+            Không trả về title, des, content hoặc bất kỳ trường nào khác.
 
-        DANH SÁCH BÀI:
-        {json.dumps(candidates, ensure_ascii=False, indent=2)}
-        """
+            DANH SÁCH BÀI:
+            {json.dumps(candidates, ensure_ascii=False, indent=2)}
+            """
         result = json.loads(self.generate(task, SELECTOR_OUTPUT_FORMAT))
         valid_ids = {article["id"] for article in articles}
         selected = [
