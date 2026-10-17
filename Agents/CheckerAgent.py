@@ -55,48 +55,48 @@ class CheckerAgent(BaseAgent):
     def run(self, article, writerOutput):
 
         task = f"""
-        {self._checkerPrompt}
+            {self._checkerPrompt}
 
-        BÀI BÁO NGUỒN:
+            BÀI BÁO NGUỒN:
 
-        Tiêu đề:
-        {article["title"]}
+            Tiêu đề:
+            {article["title"]}
 
-        Mô tả:
-        {article.get("des", article.get("description", ""))}
+            Mô tả:
+            {article.get("des", article.get("description", ""))}
 
-        Nội dung:
-        {article["content"]}
-
-
-        NỘI DUNG WRITER ĐÃ TẠO:
-
-        {writerOutput["tts_text"]}
-
-        HASHTAGS:
-        {writerOutput["hashtags"]}
+            Nội dung:
+            {article["content"]}
 
 
-        Hãy kiểm tra:
-        - Có thông tin nào không tồn tại trong nguồn không.
-        - Có thông tin nào bị diễn giải sai không.
-        - Tên riêng, số liệu, thời gian có chính xác không.
-        - Có bỏ sót ý quan trọng khiến nội dung sai lệch không.
-        - Nội dung có tự nhiên và phù hợp tin tức ngắn không.
+            NỘI DUNG WRITER ĐÃ TẠO:
 
-        Nếu có lỗi, hãy chỉ rõ lỗi nằm ở đâu và cần sửa như thế nào.
+            {writerOutput["tts_text"]}
 
-        Hãy chấm điểm nội dung từ 0 đến 10 theo các tiêu chí sau:
-        - Độ chính xác dữ kiện: 0 đến 4 điểm.
-        - Không thêm thông tin ngoài nguồn: 0 đến 2 điểm.
-        - Giữ đủ các ý quan trọng: 0 đến 2 điểm.
-        - Tự nhiên và phù hợp khi đọc bằng TTS: 0 đến 1 điểm.
-        - Độ dài phù hợp với bản tin ngắn: 0 đến 1 điểm.
+            HASHTAGS:
+            {writerOutput["hashtags"]}
 
-        Trường passed chỉ được là true khi nội dung không có lỗi nghiêm trọng.
-        revision_instruction phải nêu cụ thể cần sửa đoạn nào, sửa thành nội dung gì
-        và phải dựa trên bài báo nguồn.
-        """
+
+            Hãy kiểm tra:
+            - Có thông tin nào không tồn tại trong nguồn không.
+            - Có thông tin nào bị diễn giải sai không.
+            - Tên riêng, số liệu, thời gian có chính xác không.
+            - Có bỏ sót ý quan trọng khiến nội dung sai lệch không.
+            - Nội dung có tự nhiên và phù hợp tin tức ngắn không.
+
+            Nếu có lỗi, hãy chỉ rõ lỗi nằm ở đâu và cần sửa như thế nào.
+
+            Hãy chấm điểm nội dung từ 0 đến 10 theo các tiêu chí sau:
+            - Độ chính xác dữ kiện: 0 đến 4 điểm.
+            - Không thêm thông tin ngoài nguồn: 0 đến 2 điểm.
+            - Giữ đủ các ý quan trọng: 0 đến 2 điểm.
+            - Tự nhiên và phù hợp khi đọc bằng TTS: 0 đến 1 điểm.
+            - Độ dài phù hợp với bản tin ngắn: 0 đến 1 điểm.
+
+            Trường passed chỉ được là true khi nội dung không có lỗi nghiêm trọng.
+            revision_instruction phải nêu cụ thể cần sửa đoạn nào, sửa thành nội dung gì
+            và phải dựa trên bài báo nguồn.
+            """
 
         result = self.generate(
             task,
@@ -104,7 +104,7 @@ class CheckerAgent(BaseAgent):
         )
 
         resultcheck = json.loads(result)
-        print(resultcheck)
+        #print(resultcheck)
         return resultcheck
 
     def run_for_candidates(self, article, candidates):

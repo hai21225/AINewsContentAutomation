@@ -6,7 +6,7 @@ from Agents.WriterSuperVisor import WriterSuperVisor
 from Agents.SelectorAgent import SelectorAgent
 from Services.ResearchService import ResearchService
 from Services.TtsService import TtsService
-
+from Agents.ImagePlannerAgent import ImagePlannerAgent
 from Config.ConfigLoader import ConfigLoader
 from LLM.AiClientFactory import AiClientFactory
 
@@ -26,6 +26,7 @@ rss_config = config_loader.get_rss()
 writer_config = config_loader.get_agent("writer")
 checker_config = config_loader.get_agent("checker")
 selector_config = config_loader.get_agent("selector")
+image_planner_config = config_loader.get_agent("imagePlannerAgent")
 tts_config = config_loader.get_tts()
 
 
@@ -79,6 +80,17 @@ selector_llm_client = AiClientFactory.create(
 )
 
 
+
+image_planner_model_name = image_planner_config["model"]
+image_planner_model_config = models[image_planner_model_name]
+image_planner_provider_name = image_planner_model_config["provider"]
+image_planner_provider_config = providers[image_planner_provider_name]
+
+image_planner_llm_client = AiClientFactory.create(
+    image_planner_provider_config,
+    image_planner_model_config
+)
+
 # =========================
 # CREATE AGENTS
 # =========================
@@ -100,6 +112,7 @@ selector_agent = SelectorAgent(
     selector_llm_client
 )
 
+
 tts_service = TtsService(tts_config)
 
 supervisor_agent = WriterSuperVisor(
@@ -107,55 +120,17 @@ supervisor_agent = WriterSuperVisor(
     checker_agent
 )
 
-
+image_planner_agent = ImagePlannerAgent(
+    image_planner_config,
+    image_planner_llm_client
+)
 
 workflow = Workflow(
     research_service,
     selector_agent,
     supervisor_agent,
-    ttsService=tts_service
+    ttsService=tts_service,
+    imagePlannerAgent=image_planner_agent
 )
 
 print(workflow.run(rss_config))
-
-# =========================
-# TEST
-# =========================
-
-# articles = research_service.SearchAll(rss_config)
-# selected = selector_agent.run(articles)
-
-# selected_ids = {item["id"] for item in selected}
-# selected_articles = [
-#     article for article in articles if article["id"] in selected_ids
-# ]
-
-# print("\n========== SELECTED ARTICLES ==========")
-# print(json.dumps(selected, ensure_ascii=False, indent=2))
-
-# if not selected_articles:
-#     raise ValueError("SelectorAgent không chọn được bài báo nào.")
-
-# article = selected_articles[0]
-
-# result = supervisor_agent.run(article)
-
-
-# # =========================
-# # OUTPUT
-# # =========================
-
-# print("\n========== RESULT ==========\n")
-
-# print("Title:")
-# print(result["title"])
-
-# print("\nTTS:")
-# print(result["tts_text"])
-
-# print("\nHashtags:")
-# print(result["hashtags"])
-
-# word_count = len(result["tts_text"].split())
-
-# print("\nSố từ:", word_count)

@@ -3,11 +3,27 @@ import requests
 import urllib.parse
 
 # 1. Điền thông tin cấu hình
-api_key = "sk_aZAI65QpSwIAANVT51NrBykPeTO1W8GX"  # Thay bằng Secret Key (sk_...) của bạn
-prompt = "tạo bức ảnh có 1 hòn đảo, trên đảo có cây dừa, xung quanh là biển, khung cảnh tươi sáng"
-model = "flux"  # Hoặc mô hình khác như 'turbo', 'flux-realism',...
+api_key = ""
+topic = """
+A hand-drawn human brain connected to a computer chip,
+with small icons representing artificial intelligence,
+robots, data, and digital technology.
+"""
+
+prompt = """
+A simple hand-drawn whiteboard illustration of artificial intelligence,
+a human brain connected to a computer chip, small doodle icons of robots
+and digital technology, black marker outlines, imperfect hand-drawn strokes,
+minimalist educational explainer drawing, pure white background,
+simple 2D line art, a few blue and orange accent colors,
+clear shapes, high contrast, centered composition,
+consistent sketch style, suitable for whiteboard animation,
+no photorealism, no 3D, no gradients, no realistic textures,
+no shadows, no text, no letters, no watermark.
+"""
+model = "lykon/dreamshaper-8-lcm" # Hoặc mô hình khác như 'turbo', 'flux-realism',...
 width = 1024
-height = 1024
+height = 576
 seed = 42
 
 # 2. Mã hóa mô tả prompt để hợp lệ trên URL

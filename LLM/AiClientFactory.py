@@ -9,8 +9,6 @@ class AiClientFactory:
     _providers = {
         "ollama": OllamaClient,
         "gemini": GeminiClient,
-
-        # "openai": OpenAiClient
     }
 
     @classmethod

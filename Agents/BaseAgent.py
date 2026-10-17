@@ -22,8 +22,6 @@ class BaseAgent:
         prompt = self.build_prompt(task)
         return self._llmClient.generate(prompt, outputFormat)
 
-    def run(self, task):
-        raise NotImplementedError("Subclass must implement run()")
     
 
 

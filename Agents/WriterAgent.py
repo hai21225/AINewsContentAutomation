@@ -1,5 +1,4 @@
 import json
-
 from Agents.BaseAgent import BaseAgent
 from Console import Console
 
@@ -159,7 +158,7 @@ class WriterAgent(BaseAgent):
     
 
     def revise(self, article, previousResult, feedback):
-        print("Đang yêu cầu chỉnh sửa...")
+        Console.loading("Đang yêu cầu chỉnh sửa...")
         task = f"""
         {self._writerPrompt}
 

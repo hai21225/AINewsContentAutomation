@@ -1,14 +1,14 @@
 from Console import Console
 
 
-
 class Workflow: 
 
-    def __init__(self, researchService, selectorAgent, writingSupervisor, ttsService =None, videoService= None, socialService=None):
+    def __init__(self, researchService, selectorAgent, writingSupervisor, ttsService=None, imagePlannerAgent=None, videoService=None, socialService=None):
         self.researchService = researchService
         self.selectorAgent = selectorAgent
         self.writingSupervisor = writingSupervisor
         self.ttsService = ttsService
+        self.imagePlannerAgent = imagePlannerAgent
         self.videoService = videoService
         self.socialService = socialService
 
@@ -16,11 +16,11 @@ class Workflow:
         try:
             Console.loading("Đang lấy dữ liệu RSS")
             articles = self.researchService.SearchAll(rssConfig)
-            Console.success(f"Đã lấy {len(articles)} bài viết")
+            Console.loading(f"Đã lấy {len(articles)} bài viết")
 
             Console.loading("Đang chọn bài viết")
             selected = self.selectorAgent.run(articles)
-            Console.success(f"Đã chọn {len(selected)} bài viết")
+            Console.loading(f"Đã chọn {len(selected)} bài viết")
 
             selectedIds = {
                 x["id"]
@@ -52,7 +52,7 @@ class Workflow:
         content = self.writingSupervisor.run(
             article
         )
-        Console.success(f"Đã viết bài {index}/{total}")
+        Console.loading(f"Đã viết bài {index}/{total}")
 
         result = {
             "article_id": article["id"],
@@ -67,8 +67,19 @@ class Workflow:
                 article["id"],
                 content["tts_text"]
             )
-            Console.success(
+            if hasattr(self.ttsService, "duration"):
+                result["audio_duration_seconds"] = self.ttsService.duration(result["audio"])
+            # if self.imagePlannerAgent:
+            #     result["image_plan"] = self.imagePlannerAgent.run(
+            #         article, content["tts_text"], result.get("audio_duration_seconds")
+            #     )
+            Console.loading(
                 f"Đã tạo audio {index}/{total}: {result['audio']}"
+            )
+
+        if self.imagePlannerAgent:
+            result["image_plan"] = self.imagePlannerAgent.run(
+                article, content["tts_text"], result.get("audio_duration_seconds")
             )
         # if self.videoAgent:
         #     result["video"] = self.videoAgent.run(

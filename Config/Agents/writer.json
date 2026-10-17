@@ -11,6 +11,6 @@
     "minimum_accepted_word": 140,
     "maximum_accepted_word": 300,
 
-    "candidate_count": 3,
+    "candidate_count": 2,
     "max_retries": 2
 }

@@ -1,7 +1,12 @@
 import asyncio
 from pathlib import Path
-
+from Console import Console
 import edge_tts
+
+try:
+    from mutagen.mp3 import MP3
+except ImportError:
+    MP3 = None
 
 
 class TtsService:
@@ -39,5 +44,11 @@ class TtsService:
         output_path = self._output_path(article_id)
         self._output_dir.mkdir(parents=True, exist_ok=True)
         asyncio.run(self._generate(tts_text.strip(), output_path))
-        print(f"Đã tạo file âm thanh: {output_path}")
+        Console.loading(f"Đã tạo file âm thanh: {output_path}")
         return str(output_path)
+
+    def duration(self, audio_path):
+        """Trả về thời lượng MP3 theo giây nếu mutagen đã được cài."""
+        if MP3 is None:
+            return None
+        return round(float(MP3(audio_path).info.length), 2)
