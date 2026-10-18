@@ -1,0 +1,7 @@
+{
+    "pollinations": {
+        "type": "pollinations",
+        "api_key_env": "POLLINATIONS_API_KEY",
+        "base_url": "https://gen.pollinations.ai/image"
+    }
+}

@@ -1,0 +1,4 @@
+-r requirements.txt
+
+# Kiểm thử
+pytest>=8.0

@@ -1,0 +1,14 @@
+# Thư viện chạy pipeline
+beautifulsoup4>=4.15.0
+requests>=2.32.3
+python-dotenv>=1.2.4
+
+# LLM
+google-genai>=2.28.0
+
+# TTS
+edge-tts>=7.3.1
+mutagen>=1.48.1
+
+# Kiểm tra ảnh
+Pillow>=10.1.0

@@ -2,7 +2,7 @@
     "gemini_3.5_flash_lite": {
         "provider": "gemini",
         "model": "gemini-3.5-flash-lite",
-        "fallback_model": "gemma-4-31b-it",
+        "fallback_models": ["gemma-4-31b-it"],
         "options": {
             "temperature": 0.2
         },
@@ -12,7 +12,7 @@
     "gemini_3.1_flash_lite": {
         "provider": "gemini",
         "model": "gemini-3.1-flash-lite",
-        "fallback_model": "gemma-4-31b-it",
+        "fallback_models": ["gemma-4-31b-it"],
         "options": {
             "temperature": 0.2
         },

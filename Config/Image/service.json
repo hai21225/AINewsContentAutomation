@@ -1,0 +1,5 @@
+{
+    "model": "flux",
+    "output_dir": "output/images",
+    "seed": 42
+}

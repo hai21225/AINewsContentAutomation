@@ -1,0 +1,17 @@
+{
+    "flux": {
+        "provider": "pollinations",
+        "model": "flux",
+        "options": {
+            "width": 1920,
+            "height": 1080,
+            "seed": 42,
+            "timeout": 180
+        },
+        "retry": {
+            "max_attempts": 3,
+            "backoff_seconds": 3.0,
+            "max_backoff_seconds": 15.0
+        }
+    }
+}

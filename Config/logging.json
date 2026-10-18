@@ -1,0 +1,6 @@
+{
+    "level": "INFO",
+    "console": true,
+    "log_file": true,
+    "log_dir": "logs"
+}

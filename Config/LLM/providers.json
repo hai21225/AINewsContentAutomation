@@ -1,0 +1,29 @@
+{
+    "gemini": {
+        "type": "gemini",
+        "api_key_env": "GEMINI_API_KEY",
+        "timeout_seconds": 120,
+        "retry": {
+            "max_attempts": 2,
+            "backoff_seconds": 2.0,
+            "max_backoff_seconds": 8.0,
+            "jitter_ratio": 0.5
+        }
+    },
+
+    "ollama": {
+        "type": "ollama",
+        "base_url": "http://localhost:11434",
+        "timeout_seconds": 300,
+        "retry": {
+            "max_attempts": 1,
+            "backoff_seconds": 1.0,
+            "max_backoff_seconds": 8.0
+        }
+    },
+
+    "openai": {
+        "type": "openai",
+        "api_key_env": "OPENAI_API_KEY"
+    }
+}
