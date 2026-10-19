@@ -1,0 +1,40 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+.venv-lineart/
+build/
+dist/
+*.egg-info/
+work/
+out/
+output/
+*.mp4
+*.mp3
+*.wav
+*.mov
+*.png.tmp
+.DS_Store
+
+# Curated demo outputs are allowed. Keep generated videos elsewhere ignored.
+!examples/cases/**/*.mp4
+
+# Local third-party model repositories. Users clone these manually.
+tools/informative-drawings/
+tools/Anime2Sketch/
+
+# Model weights and downloaded archives.
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+*.zip
+*.tar
+*.tar.gz
+
+# Keep lightweight wrapper scripts versioned.
+!tools/
+!tools/lineart/
+!tools/lineart/*.py

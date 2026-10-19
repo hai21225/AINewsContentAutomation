@@ -1,0 +1,50 @@
+[project]
+name = "whiteboard-video-engine"
+version = "0.1.0"
+description = "Local-first hand-drawn whiteboard video engine with an optional Codex skill adapter"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "Pillow>=10.3",
+  "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+lineart = [
+  "torch>=2.0",
+  "torchvision>=0.15",
+  "tqdm>=4.66",
+]
+full = [
+  "typer>=0.12",
+  "loguru>=0.7",
+  "openai>=1.40",
+  "edge-tts>=6.1",
+  "torch>=2.0",
+  "torchvision>=0.15",
+  "tqdm>=4.66",
+]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10"]
+
+[project.scripts]
+whiteboard = "whiteboard_skill.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/gnipbao/whiteboard-video-engine"
+Repository = "https://github.com/gnipbao/whiteboard-video-engine"
+Issues = "https://github.com/gnipbao/whiteboard-video-engine/issues"
+CodexSkill = "https://github.com/gnipbao/codex-whiteboard-video-skill"
+
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+whiteboard_skill = ["prompts/*.txt", "assets/hands/*.png"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
