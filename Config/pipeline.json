@@ -16,5 +16,11 @@
     "workflow": {
         "fail_fast": false,
         "supervisor_max_retries": 3
+    },
+
+    "state": {
+        "enabled": true,
+        "path": "state/pipeline_state.json",
+        "resume": true
     }
 }

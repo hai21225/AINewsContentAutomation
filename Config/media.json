@@ -1,0 +1,6 @@
+{
+    "output_dir": "output/videos",
+    "fps": 24,
+    "duration_tolerance_seconds": 1.0,
+    "timeout_seconds": 1800
+}

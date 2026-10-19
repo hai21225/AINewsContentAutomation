@@ -1,7 +1,10 @@
 import pytest
 
+from pathlib import Path
+
 from Agents.Workflow import Workflow
 from Errors import AgentOutputError, MediaError
+from Services.StateStore import COMPLETED, FAILED, StateStore
 
 
 class StubResearch:
@@ -33,8 +36,11 @@ class StubSelector:
 class StubSupervisor:
     def __init__(self, failing=()):
         self.failing = set(failing)
+        self.calls = []
 
     def run(self, article):
+        self.calls.append(article["id"])
+
         if article["id"] in self.failing:
             raise AgentOutputError("không viết được kịch bản")
 
@@ -46,17 +52,31 @@ class StubSupervisor:
 
 
 class StubTts:
-    def __init__(self, failing=()):
+    def __init__(self, failing=(), output_dir=None, fingerprint="tts-fingerprint"):
         self.failing = set(failing)
+        self.output_dir = Path(output_dir) if output_dir else None
+        self.fingerprint_value = fingerprint
+        self.calls = []
 
     def run(self, article_id, tts_text):
+        self.calls.append(article_id)
+
         if article_id in self.failing:
             raise MediaError("edge-tts lỗi")
+
+        if self.output_dir is not None:
+            target = self.output_dir / f"{article_id}.mp3"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"audio")
+            return str(target)
 
         return f"outputmp3/{article_id}.mp3"
 
     def duration(self, audio_path):
         return 9.0
+
+    def fingerprint(self, tts_text):
+        return self.fingerprint_value
 
 
 class StubPlanner:
@@ -89,6 +109,73 @@ class StubImageService:
                 "error": None if ok else "pollinations lỗi",
             }
         ]
+
+
+class StubRenderService:
+    def __init__(self, failing=(), output_dir=None):
+        self.failing = set(failing)
+        self.output_dir = Path(output_dir) if output_dir else None
+        self.calls = []
+
+    def run(self, article_id, images, image_plan=None):
+        self.calls.append(article_id)
+        ok = article_id not in self.failing
+        results = []
+
+        for item in images:
+            scene_id = item["scene_id"]
+            path = None
+
+            if ok:
+                if self.output_dir is not None:
+                    target = (
+                        self.output_dir / article_id / f"scene_{scene_id:03d}.mp4"
+                    )
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(b"clip")
+                    path = str(target)
+                else:
+                    path = f"output/clips/{article_id}/scene_{scene_id:03d}.mp4"
+
+            results.append(
+                {
+                    "scene_id": scene_id,
+                    "path": path,
+                    "ok": ok,
+                    "error": None if ok else "engine lỗi",
+                }
+            )
+
+        return results
+
+
+class StubMediaService:
+    def __init__(self, failing=(), output_dir=None):
+        self.failing = set(failing)
+        self.output_dir = Path(output_dir) if output_dir else None
+        self.calls = []
+        self.audios = []
+
+    def run(self, article_id, clips, audio=None):
+        self.calls.append(article_id)
+        self.audios.append(audio)
+
+        if article_id in self.failing:
+            raise MediaError("ffmpeg lỗi")
+
+        if self.output_dir is not None:
+            target = self.output_dir / f"{article_id}.mp4"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"video")
+            path = str(target)
+        else:
+            path = f"output/videos/{article_id}.mp4"
+
+        return {
+            "video_path": path,
+            "duration_seconds": 9.0,
+            "clip_count": len(clips),
+        }
 
 
 def build_workflow(articles, **kwargs):
@@ -251,3 +338,481 @@ def test_workflow_runs_without_optional_stages(articles):
     assert "audio" not in summary["results"][0]
     assert "image_plan" not in summary["results"][0]
     assert summary["results"][0]["content"]["tts_text"] == "Nội dung bản tin."
+
+
+# ----------------------------------------------------------------------
+# Phase 3: trạng thái job & resume
+# ----------------------------------------------------------------------
+
+
+def test_state_file_records_selection_and_completed_articles(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    )
+
+    workflow.run({"feed": "url"})
+
+    reloaded = StateStore(tmp_path / "state.json")
+    reloaded.load()
+
+    assert reloaded.load()["selected_articles"] == ["id-1", "id-2", "id-3"]
+    assert all(a["status"] == COMPLETED for a in reloaded.iter_articles())
+    assert reloaded.is_stage_completed("id-1", "write")
+    assert reloaded.is_stage_completed("id-1", "image_plan")
+
+
+def test_completed_write_stage_is_reused_on_second_run(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    supervisor = StubSupervisor()
+
+    workflow = build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    )
+
+    workflow.run({})
+    assert len(supervisor.calls) == 3
+
+    summary = workflow.run({})
+
+    # Bước "write" đã xong nên không gọi lại WriterSupervisor.
+    assert supervisor.calls == ["id-1", "id-2", "id-3"]
+    assert summary["completed"] == 3
+
+
+def test_resume_reruns_only_missing_stage(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    supervisor = StubSupervisor()
+    tts = StubTts(failing={"id-1"})
+
+    workflow = build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=tts,
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    )
+
+    first = workflow.run({})
+
+    assert first["failed"] == 1
+    failed = [item for item in first["results"] if item["status"] == "failed"]
+    assert failed[0]["article_id"] == "id-1"
+    assert failed[0]["failed_stage"] == "tts"
+    assert supervisor.calls.count("id-1") == 1
+
+    # Sửa lỗi rồi chạy lại: "write" của id-1 phải được dùng lại.
+    tts.failing = set()
+    second = workflow.run({})
+
+    assert second["completed"] == 3
+    assert supervisor.calls.count("id-1") == 1
+
+
+def test_fresh_run_ignores_previous_state(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    supervisor = StubSupervisor()
+
+    build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    ).run({})
+
+    fresh = build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=StateStore(tmp_path / "state.json"),
+        resume=False,
+    )
+    fresh.run({})
+
+    # resume=False xoá state cũ nên WriterSupervisor phải chạy lại cho cả 3 bài.
+    assert len(supervisor.calls) == 6
+
+
+def test_missing_artifact_makes_stage_run_again(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    supervisor = StubSupervisor()
+
+    build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    ).run({})
+
+    # Giả lập file audio bị xoá: state nói xong nhưng artifact không còn.
+    store.mark_stage_failed("id-1", "tts", "giả lập mất file")
+    store.save()
+
+    workflow = build_workflow(
+        articles,
+        supervisor=supervisor,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    )
+    summary = workflow.run({})
+
+    assert summary["completed"] == 3
+    assert store.get_stage("id-1", "tts")["status"] == COMPLETED
+
+
+def test_failed_article_is_recorded_in_state(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+
+    build_workflow(
+        articles,
+        supervisor=StubSupervisor(failing={"id-2"}),
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        state_store=store,
+    ).run({})
+
+    entry = store.get_article("id-2")
+    assert entry["status"] == FAILED
+    assert entry["failed_stage"] == "write"
+    assert "không viết được kịch bản" in entry["error"]
+
+
+# ----------------------------------------------------------------------
+# Phase 4: dựng clip whiteboard
+# ----------------------------------------------------------------------
+
+
+def test_render_stage_produces_clips(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+    )
+
+    summary = workflow.run({})
+
+    assert summary["completed"] == 3
+    clips = summary["results"][0]["clips"]
+    assert clips[0]["ok"] is True
+    assert clips[0]["path"].endswith("scene_001.mp4")
+
+
+def test_render_stage_is_skipped_without_render_service(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+    )
+
+    summary = workflow.run({})
+
+    assert summary["completed"] == 3
+    assert "clips" not in summary["results"][0]
+
+
+def test_render_failure_is_reported_with_stage(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(failing={"id-1"}),
+    )
+
+    summary = workflow.run({})
+
+    failed = [item for item in summary["results"] if item["status"] == "failed"]
+    assert failed[0]["failed_stage"] == "render"
+
+
+def test_render_stage_receives_images_and_plan(articles):
+    render_service = StubRenderService()
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=render_service,
+        article_limit=1,
+    )
+
+    workflow.run({})
+
+    assert render_service.calls == ["id-1"]
+
+
+def test_render_stage_is_reused_on_second_run(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    render_service = StubRenderService(output_dir=tmp_path / "clips")
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=render_service,
+        state_store=store,
+    )
+
+    workflow.run({})
+    assert len(render_service.calls) == 3
+
+    summary = workflow.run({})
+
+    # Clip còn trên đĩa nên bước "render" được dùng lại, không render lại.
+    assert render_service.calls == ["id-1", "id-2", "id-3"]
+    assert summary["completed"] == 3
+
+
+def test_missing_clip_makes_render_run_again(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    render_service = StubRenderService(output_dir=tmp_path / "clips")
+
+    build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=render_service,
+        state_store=store,
+    ).run({})
+
+    # Giả lập clip bị xoá: state nói xong nhưng artifact không còn.
+    (tmp_path / "clips" / "id-1" / "scene_001.mp4").unlink()
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=render_service,
+        state_store=store,
+    )
+    summary = workflow.run({})
+
+    assert render_service.calls.count("id-1") == 2
+    assert summary["completed"] == 3
+
+
+# ----------------------------------------------------------------------
+# Phase 4b: ghép video cuối
+# ----------------------------------------------------------------------
+
+
+def test_mux_stage_produces_final_video(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=StubMediaService(),
+    )
+
+    summary = workflow.run({})
+
+    assert summary["completed"] == 3
+    video = summary["results"][0]["video"]
+    assert video["video_path"].endswith(".mp4")
+    assert video["clip_count"] == 1
+
+
+def test_mux_receives_narration_audio(articles):
+    media_service = StubMediaService()
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=media_service,
+        article_limit=1,
+    )
+
+    workflow.run({})
+
+    assert media_service.audios == ["outputmp3/id-1.mp3"]
+
+
+def test_mux_stage_is_skipped_without_media_service(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+    )
+
+    summary = workflow.run({})
+
+    assert "video" not in summary["results"][0]
+
+
+def test_mux_stage_is_skipped_without_clips(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        media_service=StubMediaService(),
+    )
+
+    summary = workflow.run({})
+
+    assert summary["completed"] == 3
+    assert "video" not in summary["results"][0]
+
+
+def test_mux_failure_is_reported_with_stage(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=StubMediaService(failing={"id-1"}),
+    )
+
+    summary = workflow.run({})
+
+    failed = [item for item in summary["results"] if item["status"] == "failed"]
+    assert failed[0]["failed_stage"] == "mux"
+
+
+def test_mux_stage_is_reused_on_second_run(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    media_service = StubMediaService(output_dir=tmp_path / "videos")
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=media_service,
+        state_store=store,
+    )
+
+    workflow.run({})
+    assert len(media_service.calls) == 3
+
+    summary = workflow.run({})
+
+    # Video cuối còn trên đĩa nên bước "mux" được dùng lại.
+    assert media_service.calls == ["id-1", "id-2", "id-3"]
+    assert summary["completed"] == 3
+
+
+def test_missing_video_makes_mux_run_again(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    media_service = StubMediaService(output_dir=tmp_path / "videos")
+
+    build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=media_service,
+        state_store=store,
+    ).run({})
+
+    (tmp_path / "videos" / "id-1.mp4").unlink()
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(),
+        media_service=media_service,
+        state_store=store,
+    )
+    summary = workflow.run({})
+
+    assert media_service.calls.count("id-1") == 2
+    assert summary["completed"] == 3
+
+
+# ----------------------------------------------------------------------
+# Fingerprint: đầu vào đổi thì bước và các bước sau phải chạy lại
+# ----------------------------------------------------------------------
+
+
+def test_changed_tts_fingerprint_invalidates_audio_and_downstream(
+    articles, tmp_path
+):
+    store = StateStore(tmp_path / "state.json")
+    tts = StubTts(output_dir=tmp_path / "mp3", fingerprint="v1")
+    render = StubRenderService(output_dir=tmp_path / "clips")
+    media = StubMediaService(output_dir=tmp_path / "videos")
+
+    def build():
+        return build_workflow(
+            articles,
+            tts_service=tts,
+            image_planner_agent=StubPlanner(),
+            image_service=StubImageService(),
+            render_service=render,
+            media_service=media,
+            state_store=store,
+            article_limit=1,
+        )
+
+    build().run({})
+    build().run({})
+
+    # Chưa đổi gì: audio và clip được dùng lại.
+    assert tts.calls == ["id-1"]
+    assert render.calls == ["id-1"]
+
+    tts.fingerprint_value = "v2"
+
+    build().run({})
+
+    # Đổi voice -> audio làm lại, kéo theo ảnh/clip/video cũng làm lại.
+    assert tts.calls == ["id-1", "id-1"]
+    assert render.calls == ["id-1", "id-1"]
+    assert media.calls == ["id-1", "id-1"]
+
+
+def test_can_reuse_rejects_changed_fingerprint(tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    workflow = build_workflow([], state_store=store)
+
+    store.upsert_article({"id": "x"})
+    store.mark_stage_completed(
+        "x", "tts", output={"audio_path": "a.mp3"}, artifacts=[],
+        metadata={"fingerprint": "a"},
+    )
+    cached = store.get_stage("x", "tts")
+
+    assert workflow._can_reuse(cached, None, "a") is True
+    assert workflow._can_reuse(cached, None, "b") is False
+
+    # State cũ không có fingerprint: vẫn dùng lại (migration an toàn).
+    legacy = {"status": "completed", "artifacts": [], "metadata": {}}
+    assert workflow._can_reuse(legacy, None, "b") is True

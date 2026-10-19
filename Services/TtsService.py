@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -55,6 +57,23 @@ class TtsService:
     @property
     def provider_name(self):
         return self._provider_name
+
+    def fingerprint(self, tts_text):
+        """Định danh cấu hình + văn bản để quyết định có thể dùng lại audio cũ.
+
+        Đổi voice/rate/pitch/volume (hoặc nội dung lời đọc) -> chuỗi đổi ->
+        bước ``tts`` không được dùng lại file audio cũ mà phải chạy lại.
+        """
+        payload = {
+            "provider": self._provider_name,
+            "provider_config": self._provider_config,
+            "text": tts_text,
+        }
+        encoded = json.dumps(
+            payload, ensure_ascii=False, sort_keys=True
+        ).encode("utf-8")
+
+        return hashlib.sha256(encoded).hexdigest()
 
     # ------------------------------------------------------------------
     # Sinh audio

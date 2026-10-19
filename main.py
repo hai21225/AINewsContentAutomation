@@ -16,7 +16,10 @@ from ImageGeneration.ImageClientFactory import ImageClientFactory
 from LLM.LlmClientFactory import LlmClientFactory
 from Services.ImageService import ImageService
 from Services.LogService import LogService
+from Services.MediaService import MediaService
+from Services.RenderService import RenderService
 from Services.ResearchService import ResearchService
+from Services.StateStore import StateStore
 from Services.TtsService import TtsService
 
 EXIT_OK = 0
@@ -59,6 +62,21 @@ def parse_args(argv=None):
         "--no-images",
         action="store_true",
         help="Bỏ qua bước sinh ảnh.",
+    )
+    parser.add_argument(
+        "--no-render",
+        action="store_true",
+        help="Bỏ qua bước dựng clip whiteboard từ ảnh.",
+    )
+    parser.add_argument(
+        "--no-mux",
+        action="store_true",
+        help="Bỏ qua bước ghép clip + audio thành video cuối.",
+    )
+    parser.add_argument(
+        "--fresh",
+        action="store_true",
+        help="Bỏ qua trạng thái đã lưu và chạy lại từ đầu (không resume).",
     )
     parser.add_argument(
         "--fail-fast",
@@ -104,6 +122,7 @@ def build_components(loader, log_service, args):
     pipeline_config = loader.get_pipeline()
     workflow_config = pipeline_config.get("workflow", {}) or {}
     retry_config = pipeline_config.get("retry", {}) or {}
+    state_config = pipeline_config.get("state", {}) or {}
 
     writer_config = loader.get_agent("writer")
     checker_config = loader.get_agent("checker")
@@ -170,6 +189,20 @@ def build_components(loader, log_service, args):
             image_client, image_config, log_service=log_service
         )
 
+    render_service = None
+
+    if not args.no_render:
+        render_service = RenderService(
+            loader.get_render(), log_service=log_service
+        )
+
+    media_service = None
+
+    if not args.no_mux and render_service is not None:
+        media_service = MediaService(
+            loader.get_media(), log_service=log_service
+        )
+
     workflow = Workflow(
         research_service,
         selector_agent,
@@ -177,9 +210,13 @@ def build_components(loader, log_service, args):
         tts_service=tts_service,
         image_planner_agent=image_planner_agent,
         image_service=image_service,
+        render_service=render_service,
+        media_service=media_service,
         log_service=log_service,
         article_limit=args.limit,
         fail_fast=args.fail_fast or bool(workflow_config.get("fail_fast", False)),
+        state_store=create_state_store(state_config, log_service),
+        resume=not args.fresh and bool(state_config.get("resume", True)),
     )
 
     return {
@@ -187,7 +224,18 @@ def build_components(loader, log_service, args):
         "rss_config": loader.get_rss(),
         "models": models,
         "providers": providers,
+        "state_config": state_config,
+        "render_service": render_service,
+        "media_service": media_service,
     }
+
+
+def create_state_store(state_config, log_service):
+    """Tạo StateStore từ khối ``state`` trong pipeline.json (None nếu tắt)."""
+    if not state_config.get("enabled", True):
+        return None
+
+    return StateStore(state_config.get("path") or None, log_service=log_service)
 
 
 def describe_plan(components, loader, args):
@@ -207,6 +255,42 @@ def describe_plan(components, loader, args):
 
     Console.print(f"Giới hạn bài     : {args.limit if args.limit else 'không'}")
     Console.print(f"Sinh ảnh         : {'tắt' if args.no_images else 'bật'}")
+
+    render_service = components.get("render_service")
+
+    if render_service is None:
+        Console.print("Render whiteboard: tắt")
+    else:
+        cli_state = "có" if render_service.is_available() else "THIẾU"
+        Console.print(
+            f"Render whiteboard: bật (engine CLI: {cli_state} - "
+            f"{render_service.cli_path})"
+        )
+
+    media_service = components.get("media_service")
+
+    if media_service is None:
+        Console.print("Ghép video cuối  : tắt")
+    else:
+        tool_state = "có" if media_service.is_available() else "THIẾU"
+        Console.print(
+            f"Ghép video cuối  : bật (ffmpeg: {tool_state} - "
+            f"{media_service.ffmpeg_path})"
+        )
+
+    state_store = components["workflow"].state_store
+
+    if state_store is None:
+        Console.print("Trạng thái       : tắt")
+    else:
+        if args.fresh:
+            mode = "chạy lại từ đầu (--fresh)"
+        elif components.get("state_config", {}).get("resume", True):
+            mode = "resume"
+        else:
+            mode = "không resume"
+
+        Console.print(f"Trạng thái       : {state_store.path} ({mode})")
 
 
 def print_report(summary):
@@ -270,6 +354,11 @@ def main(argv=None):
 
     if log_service.log_path:
         Console.print(f"Log chi tiết: {log_service.log_path}")
+
+    state_store = components["workflow"].state_store
+
+    if state_store is not None:
+        Console.print(f"Trạng thái job: {state_store.path}")
 
     log_service.close()
 

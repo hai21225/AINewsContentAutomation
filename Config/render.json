@@ -1,0 +1,7 @@
+{
+    "engine_dir": "Lib/WhiteBoardEngine/whiteboard-video-engine",
+    "output_dir": "output/clips",
+    "duration_seconds": 5.0,
+    "fps": 24,
+    "timeout_seconds": 1800
+}

@@ -158,3 +158,31 @@ def test_ffprobe_from_environment(tmp_path, monkeypatch):
     monkeypatch.setenv("FFPROBE_PATH", "D:/tools/ffprobe.exe")
 
     assert build_service(tmp_path).ffprobe_executable() == "D:/tools/ffprobe.exe"
+
+
+# ----------------------------------------------------------------------
+# Fingerprint (Phase 4b: đổi voice phải làm lại audio)
+# ----------------------------------------------------------------------
+
+
+def test_fingerprint_is_stable_for_same_input(tmp_path):
+    first = build_service(tmp_path).fingerprint("Nội dung đọc.")
+    second = build_service(tmp_path).fingerprint("Nội dung đọc.")
+
+    assert first == second
+
+
+def test_fingerprint_changes_when_voice_changes(tmp_path):
+    base = build_service(tmp_path).fingerprint("Nội dung đọc.")
+
+    other = build_service(
+        tmp_path, providers={"edge_tts": {"voice": "vi-VN-NamMinhNeural"}}
+    ).fingerprint("Nội dung đọc.")
+
+    assert base != other
+
+
+def test_fingerprint_changes_when_text_changes(tmp_path):
+    service = build_service(tmp_path)
+
+    assert service.fingerprint("Câu một.") != service.fingerprint("Câu hai.")

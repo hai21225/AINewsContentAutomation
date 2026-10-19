@@ -226,6 +226,7 @@ __marimo__/
 # Pipeline outputs
 logs/
 output/
+outputmp3/
 state/
 
 # Vendored whiteboard engine: scratch artifacts from local render tests.
@@ -233,3 +234,6 @@ state/
 # outputs live under the engine tree.
 Lib/WhiteBoardEngine/whiteboard-video-engine/test_images/
 Lib/WhiteBoardEngine/whiteboard-video-engine/test_output/
+# Working prototype kept as a reference for the real engine CLI (it uses
+# `render-photo`, which needs lineart model weights this repo does not ship).
+Lib/WhiteBoardEngine/whiteboard-video-engine/test_engine_video.py

@@ -56,6 +56,10 @@ class ImageService:
     def output_dir(self):
         return self._output_dir
 
+    @property
+    def seed(self):
+        return self._base_seed
+
     def article_dir(self, article_id):
         """Thư mục ảnh của một bài (chống path traversal)."""
         if not article_id or Path(str(article_id)).name != str(article_id):

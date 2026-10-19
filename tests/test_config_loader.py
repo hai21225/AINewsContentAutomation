@@ -26,8 +26,20 @@ def test_loads_real_project_config():
 
     assert loader.get_logging()["level"]
     assert loader.get_pipeline()["research"]["max_attempts"] >= 1
+    assert loader.get_pipeline()["state"]["path"]
     assert "flux" in loader.get_image_models()
     assert loader.get_image_service()["output_dir"]
+
+    render_config = loader.get_render()
+    assert render_config["engine_dir"] == (
+        "Lib/WhiteBoardEngine/whiteboard-video-engine"
+    )
+    assert render_config["fps"] >= 1
+    assert render_config["output_dir"]
+
+    media_config = loader.get_media()
+    assert media_config["output_dir"]
+    assert media_config["duration_tolerance_seconds"] > 0
 
 
 def test_default_config_dir_is_independent_of_cwd(tmp_path, monkeypatch):

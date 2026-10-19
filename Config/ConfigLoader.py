@@ -110,3 +110,17 @@ class ConfigLoader:
 
     def get_image_service(self):
         return self._load_json(Path("Image") / "service.json")
+
+    # ------------------------------------------------------------------
+    # Render (engine whiteboard)
+    # ------------------------------------------------------------------
+
+    def get_render(self):
+        return self._load_json(Path("render.json"))
+
+    # ------------------------------------------------------------------
+    # Ghép video cuối (ffmpeg)
+    # ------------------------------------------------------------------
+
+    def get_media(self):
+        return self._load_json(Path("media.json"))

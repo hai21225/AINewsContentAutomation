@@ -6,6 +6,8 @@ Phân loại lỗi theo cách xử lý thay vì theo nơi phát sinh:
 - ``ValidationError``: dữ liệu vào/ra không hợp lệ (kể cả output của LLM).
 - ``AgentOutputError``: LLM trả về JSON sai/thiếu trường bắt buộc.
 - ``MediaError``: file media hỏng/thiếu (audio, ảnh, video).
+- ``StateError``: file trạng thái job (state JSON) hỏng/sai schema/không đọc
+  được. Không tự "sửa" bằng cách ghi đè để tránh mất trạng thái thật.
 - ``ExternalServiceError``: lỗi từ dịch vụ ngoài (HTTP/API). Có cờ
   ``retryable`` để tầng retry quyết định thử lại hay không.
 
@@ -39,6 +41,10 @@ class AgentOutputError(ValidationError):
 
 class MediaError(AppError):
     """File media bị thiếu, rỗng hoặc không giải mã/đọc được."""
+
+
+class StateError(AppError):
+    """File trạng thái (state JSON) hỏng, sai schema hoặc không đọc được."""
 
 
 class ExternalServiceError(AppError):
