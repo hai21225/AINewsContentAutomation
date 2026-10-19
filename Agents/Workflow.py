@@ -52,13 +52,16 @@ class Workflow:
     State cũ chưa có fingerprint vẫn được dùng lại như trước (migration an
     toàn: chỉ áp dụng từ lần chạy ghi fingerprint trở đi).
 
-    Ghi chú: ``publish`` đã được khai báo sẵn trong ``StateStore.STAGES``
-    (trạng thái ``pending``) và sẽ được nối ở Phase 5.
+    Phase 5: bước ``publish`` ghi bản kê video (tiêu đề/mô tả/hashtag) và — khi
+    ``Config/publish.json`` đặt ``mode = "publish"`` — đăng thật lên Page
+    Facebook qua ``PublishService``. Kết quả nằm ở ``result["publish"]``.
+    Mặc định ``mode = "prepare"``: chỉ ghi bản kê, **không gọi mạng**.
     """
 
     def __init__(self, research_service, selector_agent, writing_supervisor,
                  tts_service=None, image_planner_agent=None,
                  image_service=None, render_service=None, media_service=None,
+                 publish_service=None,
                  log_service=None, article_limit=None, fail_fast=False,
                  state_store=None, resume=True):
         self.research_service = research_service
@@ -69,6 +72,7 @@ class Workflow:
         self.image_service = image_service
         self.render_service = render_service
         self.media_service = media_service
+        self.publish_service = publish_service
         self.log_service = log_service or NullLogService()
         self.article_limit = int(article_limit) if article_limit else None
         self.fail_fast = bool(fail_fast)
@@ -255,6 +259,26 @@ class Workflow:
                 )
                 result["video"] = mux_stage["output"]
 
+            if self.publish_service and result.get("video"):
+                stage = "publish"
+                video = result["video"]
+                publish_fingerprint = _digest(
+                    self.publish_service.platform,
+                    self.publish_service.mode,
+                    _file_fingerprint(video.get("video_path")),
+                    content.get("title"),
+                    content.get("hashtags"),
+                )
+                publish_stage = self._run_or_reuse(
+                    article_id, "publish",
+                    lambda: self._publish_video(
+                        article_id, video, content
+                    ),
+                    validate=_has_publish_result,
+                    fingerprint=publish_fingerprint,
+                )
+                result["publish"] = publish_stage["output"]
+
         except Exception as error:
             self._mark_failed(result, stage, error)
             self._record_failure(article_id, stage, result["error"])
@@ -407,6 +431,19 @@ class Workflow:
             key: value for key, value in video.items() if key != "video_path"
         }
         return video, [video["video_path"]], metadata
+
+    def _publish_video(self, article_id, video, content):
+        result = self.publish_service.run(
+            article_id,
+            video["video_path"],
+            title=content.get("title"),
+            hashtags=content.get("hashtags"),
+            duration_seconds=video.get("duration_seconds"),
+        )
+        metadata = {
+            key: value for key, value in result.items() if key != "manifest_path"
+        }
+        return result, [result["manifest_path"]], metadata
 
     # ------------------------------------------------------------------
     # Trạng thái job
@@ -563,6 +600,24 @@ def _has_clips(stage):
 def _has_video(stage):
     output = stage.get("output")
     return bool(isinstance(output, dict) and output.get("video_path"))
+
+
+def _has_publish_result(stage):
+    """Chỉ coi là xong khi có bản kê; 'published' thì BẮT BUỘC có post_id."""
+    output = stage.get("output")
+
+    if not isinstance(output, dict):
+        return False
+
+    status = output.get("status")
+
+    if status == "prepared":
+        return True
+
+    if status == "published":
+        return bool(output.get("post_id"))
+
+    return False
 
 
 def _is_positive_number(stage):

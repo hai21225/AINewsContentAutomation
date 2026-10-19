@@ -178,6 +178,43 @@ class StubMediaService:
         }
 
 
+class StubPublishService:
+    def __init__(self, failing=(), mode="prepare", output_dir=None):
+        self.failing = set(failing)
+        self.platform = "facebook"
+        self.mode = mode
+        self.output_dir = Path(output_dir) if output_dir else None
+        self.calls = []
+
+    def run(self, article_id, video_path, title=None, hashtags=None,
+            description=None, duration_seconds=None):
+        self.calls.append(article_id)
+
+        if article_id in self.failing:
+            raise MediaError("facebook lỗi")
+
+        if self.output_dir is not None:
+            target = self.output_dir / f"{article_id}.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("{}", encoding="utf-8")
+            manifest = str(target)
+        else:
+            manifest = f"output/publish/{article_id}.json"
+
+        published = self.mode == "publish"
+
+        return {
+            "article_id": article_id,
+            "platform": self.platform,
+            "mode": self.mode,
+            "status": "published" if published else "prepared",
+            "post_id": "999_1" if published else None,
+            "manifest_path": manifest,
+            "title": title,
+            "hashtags": hashtags,
+        }
+
+
 def build_workflow(articles, **kwargs):
     return Workflow(
         StubResearch(articles),
@@ -816,3 +853,103 @@ def test_can_reuse_rejects_changed_fingerprint(tmp_path):
     # State cũ không có fingerprint: vẫn dùng lại (migration an toàn).
     legacy = {"status": "completed", "artifacts": [], "metadata": {}}
     assert workflow._can_reuse(legacy, None, "b") is True
+
+
+# ----------------------------------------------------------------------
+# Publish (Phase 5)
+# ----------------------------------------------------------------------
+
+
+def publish_workflow(articles, tmp_path, publish, **kwargs):
+    return build_workflow(
+        articles,
+        tts_service=StubTts(output_dir=tmp_path / "mp3"),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=StubRenderService(output_dir=tmp_path / "clips"),
+        media_service=StubMediaService(output_dir=tmp_path / "videos"),
+        publish_service=publish,
+        **kwargs,
+    )
+
+
+def test_publish_stage_records_manifest(articles, tmp_path):
+    publish = StubPublishService(output_dir=tmp_path / "publish")
+    workflow = publish_workflow(articles, tmp_path, publish, article_limit=1)
+
+    summary = workflow.run({})
+
+    result = summary["results"][0]
+    assert result["status"] == "completed"
+    assert result["publish"]["status"] == "prepared"
+    assert result["publish"]["post_id"] is None
+    assert Path(result["publish"]["manifest_path"]).is_file()
+    assert result["publish"]["title"] == "Bài 1"
+    assert result["publish"]["hashtags"] == ["#a", "#b", "#c"]
+    assert publish.calls == ["id-1"]
+
+
+def test_publish_stage_skipped_without_service(articles):
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+    )
+
+    summary = workflow.run({})
+
+    assert "publish" not in summary["results"][0]
+
+
+def test_publish_stage_skipped_without_video(articles, tmp_path):
+    publish = StubPublishService(output_dir=tmp_path / "publish")
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        publish_service=publish,
+    )
+
+    summary = workflow.run({})
+
+    assert "publish" not in summary["results"][0]
+    assert publish.calls == []
+
+
+def test_publish_failure_is_reported_with_stage(articles, tmp_path):
+    publish = StubPublishService(
+        failing={"id-1"}, output_dir=tmp_path / "publish"
+    )
+    workflow = publish_workflow(articles, tmp_path, publish, article_limit=1)
+
+    summary = workflow.run({})
+
+    assert summary["results"][0]["status"] == "failed"
+    assert summary["results"][0]["failed_stage"] == "publish"
+
+
+def test_publish_stage_is_reused_until_mode_changes(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    publish = StubPublishService(output_dir=tmp_path / "publish")
+
+    def build():
+        return publish_workflow(
+            articles, tmp_path, publish, state_store=store, article_limit=1
+        )
+
+    build().run({})
+    build().run({})
+
+    # Vẫn chế độ prepare: bản kê được dùng lại, không ghi lại.
+    assert publish.calls == ["id-1"]
+
+    # Đổi sang đăng thật -> đầu vào publish đổi -> phải chạy lại.
+    publish.mode = "publish"
+
+    summary = build().run({})
+
+    assert publish.calls == ["id-1", "id-1"]
+    assert summary["results"][0]["publish"]["status"] == "published"
+    assert summary["results"][0]["publish"]["post_id"] == "999_1"

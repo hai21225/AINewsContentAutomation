@@ -17,6 +17,7 @@ from LLM.LlmClientFactory import LlmClientFactory
 from Services.ImageService import ImageService
 from Services.LogService import LogService
 from Services.MediaService import MediaService
+from Services.PublishService import PublishService
 from Services.RenderService import RenderService
 from Services.ResearchService import ResearchService
 from Services.StateStore import StateStore
@@ -72,6 +73,11 @@ def parse_args(argv=None):
         "--no-mux",
         action="store_true",
         help="Bỏ qua bước ghép clip + audio thành video cuối.",
+    )
+    parser.add_argument(
+        "--no-publish",
+        action="store_true",
+        help="Bỏ qua bước chuẩn bị/đăng video lên mạng xã hội.",
     )
     parser.add_argument(
         "--fresh",
@@ -203,6 +209,18 @@ def build_components(loader, log_service, args):
             loader.get_media(), log_service=log_service
         )
 
+    publish_service = None
+
+    if not args.no_publish:
+        publish_config = loader.get_publish()
+
+        if publish_config.get("mode") != "off":
+            publish_service = PublishService(
+                publish_config,
+                log_service=log_service,
+                retry_config=retry_config,
+            )
+
     workflow = Workflow(
         research_service,
         selector_agent,
@@ -212,6 +230,7 @@ def build_components(loader, log_service, args):
         image_service=image_service,
         render_service=render_service,
         media_service=media_service,
+        publish_service=publish_service,
         log_service=log_service,
         article_limit=args.limit,
         fail_fast=args.fail_fast or bool(workflow_config.get("fail_fast", False)),
@@ -227,6 +246,7 @@ def build_components(loader, log_service, args):
         "state_config": state_config,
         "render_service": render_service,
         "media_service": media_service,
+        "publish_service": publish_service,
     }
 
 
@@ -276,6 +296,24 @@ def describe_plan(components, loader, args):
         Console.print(
             f"Ghép video cuối  : bật (ffmpeg: {tool_state} - "
             f"{media_service.ffmpeg_path})"
+        )
+
+    publish_service = components.get("publish_service")
+
+    if publish_service is None:
+        Console.print("Đăng bài         : tắt")
+    else:
+        if publish_service.mode == "publish":
+            credential_state = (
+                "có" if publish_service.is_configured() else "THIẾU"
+            )
+        else:
+            credential_state = "không cần (prepare)"
+
+        Console.print(
+            f"Đăng bài         : {publish_service.platform} "
+            f"(chế độ: {publish_service.mode}, "
+            f"credential: {credential_state})"
         )
 
     state_store = components["workflow"].state_store

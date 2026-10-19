@@ -41,6 +41,12 @@ def test_loads_real_project_config():
     assert media_config["output_dir"]
     assert media_config["duration_tolerance_seconds"] > 0
 
+    publish_config = loader.get_publish()
+    assert publish_config["platform"] == "facebook"
+    assert publish_config["mode"] in ("prepare", "publish", "off")
+    assert publish_config["facebook"]["api_version"]
+    assert publish_config["facebook"]["page_id_env"]
+
 
 def test_default_config_dir_is_independent_of_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -68,6 +74,15 @@ def test_missing_file_raises_configuration_error(tmp_path):
         loader.get_tts()
 
     assert "tts.json" in str(excinfo.value)
+
+
+def test_missing_publish_config_raises(tmp_path):
+    loader = ConfigLoader(tmp_path)
+
+    with pytest.raises(ConfigurationError) as excinfo:
+        loader.get_publish()
+
+    assert "publish.json" in str(excinfo.value)
 
 
 def test_invalid_json_raises_configuration_error(tmp_path):

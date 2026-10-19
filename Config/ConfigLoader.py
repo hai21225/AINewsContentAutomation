@@ -124,3 +124,10 @@ class ConfigLoader:
 
     def get_media(self):
         return self._load_json(Path("media.json"))
+
+    # ------------------------------------------------------------------
+    # Đăng bài lên mạng xã hội
+    # ------------------------------------------------------------------
+
+    def get_publish(self):
+        return self._load_json(Path("publish.json"))
