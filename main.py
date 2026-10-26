@@ -307,7 +307,7 @@ def describe_plan(components, loader, args):
             credential_state = (
                 "có" if publish_service.is_configured() else "THIẾU"
             )
-        else:
+        else:   
             credential_state = "không cần (prepare)"
 
         Console.print(
