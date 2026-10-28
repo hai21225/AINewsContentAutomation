@@ -1,25 +1,15 @@
 # AI News Content Automation
 
-Biến tin tức từ RSS thành **video whiteboard ngắn có thuyết minh**, rồi chuẩn bị
-hoặc đăng lên mạng xã hội.
+Lấy tin tức từ RSS → viết kịch bản → đọc giọng người (TTS) → vẽ storyboard whiteboard → render video → ghép âm thanh → đăng lên YouTube.
 
-## Quy trình
+Quy trình:
 
 ```
-collect_articles → select_articles → write → tts → audio_duration
-       → image_plan → images → render → mux → publish
+collect → select → write → tts → audio_duration
+   → image_plan → images → render → mux → publish
 ```
 
-- **write**: viết lời đọc (TTS) + tiêu đề + hashtag, có kiểm tra chéo.
-- **tts / audio_duration**: sinh audio lời đọc và đo thời lượng thật.
-- **image_plan / images**: chia cảnh và sinh ảnh line-art cho từng cảnh.
-- **render**: dựng mỗi cảnh thành một clip whiteboard (engine ngoài).
-- **mux**: ghép các clip + audio thành video cuối bằng ffmpeg.
-- **publish**: ghi bản kê và (tuỳ chế độ) đăng video lên Facebook Page và/hoặc
-  YouTube.
-
-Mỗi bước được lưu trạng thái trong `state/pipeline_state.json`, nên lần chạy sau
-chỉ làm lại phần còn thiếu. Dùng `--fresh` để chạy lại từ đầu.
+Mỗi bước lưu trạng thái trong `state/pipeline_state.json`; lần chạy sau chỉ làm phần còn thiếu. Dùng `--fresh` để chạy lại từ đầu.
 
 ## Cài đặt
 
@@ -27,184 +17,73 @@ chỉ làm lại phần còn thiếu. Dùng `--fresh` để chạy lại từ đ
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-pip install -r requirements-dev.txt   # cho test
+pip install -r requirements-dev.txt   # nếu muốn chạy test
 ```
 
-Đăng ký biến môi trường:
+Biến môi trường:
 
 ```powershell
 Copy-Item .env.example .env
-# rồi điền GEMINI_API_KEY, POLLINATIONS_API_KEY, ...
+# sửa .env: GEMINI_API_KEY, POLLINATIONS_API_KEY, YT_*, ...
 ```
 
-Cần thêm **ffmpeg/ffprobe** trong PATH (hoặc đặt `FFMPEG_PATH` / `FFPROBE_PATH`),
-và engine whiteboard ở `Lib/WhiteBoardEngine/whiteboard-video-engine` (đặt
-`WHITEBOARD_CLI` nếu CLI nằm chỗ khác).
+Phụ thuộc bên ngoài (cài tay):
+- **ffmpeg/ffprobe** trong PATH (hoặc `FFMPEG_PATH` / `FFPROBE_PATH`) — dùng ghép video.
+- **WhiteBoardEngine** tại `Lib/WhiteBoardEngine/whiteboard-video-engine` (tạo `.venv` rồi `pip install -e .`), hoặc đặt `WHITEBOARD_CLI`.
 
 ## Chạy
 
 ```powershell
-python main.py --dry-run          # kiểm tra cấu hình, không gọi mạng
-python main.py                    # chạy đầy đủ
-python main.py --limit 1          # thử nhanh một bài
-python main.py --no-mux           # dừng trước khi ghép video
-python main.py --fresh            # bỏ trạng thái cũ, chạy lại từ đầu
-python youtube_auth.py            # một lần: lấy refresh token YouTube
+python main.py --dry-run     # kiểm tra cấu hình, không gọi mạng
+python main.py               # chạy đầy đủ
+python main.py --limit 1     # thử nhanh 1 bài
+python main.py --fresh       # bỏ trạng thái cũ, chạy lại từ đầu
+python youtube_auth.py       # 1 lần: lấy refresh token YouTube (OAuth loopback)
 ```
 
-Cờ liên quan: `--no-images`, `--no-render`, `--no-mux`, `--no-publish`,
-`--fail-fast`, `--log-level`.
+Cờ hay dùng: `--no-images`, `--no-render`, `--no-mux`, `--no-publish`, `--fail-fast`, `--log-level`.
 
 Mã thoát: `0` thành công, `1` có bài thất bại, `2` pipeline không chạy được.
 
-## Cấu hình
-
-Mọi cấu hình nằm trong `Config/`:
-
-| File | Nội dung |
-| --- | --- |
-| `rss.json` | Danh sách feed đầu vào |
-| `pipeline.json` | Retry, workflow, trạng thái job |
-| `logging.json` | Mức log |
-| `tts.json` | Provider TTS và voice |
-| `Agents/*.json` | Model + prompt cho từng agent |
-| `Image/*.json` | Model sinh ảnh và provider |
-| `render.json` | Engine whiteboard, fps, khung hình (width/height), thời lượng mỗi cảnh |
-| `media.json` | Thư mục video cuối, sai số thời lượng |
-| `publish.json` | Nền tảng, chế độ và thông tin đăng bài |
-
-## Đăng bài (bước `publish`)
-
-Bước này **mặc định không đăng gì**: `Config/publish.json` để `"mode": "prepare"`
-— chỉ ghi bản kê `output/publish/<article_id>.json` (tiêu đề, mô tả, hashtag,
-đường dẫn video) rồi dừng.
-
-Nền tảng được chọn bằng `platform` (một nền tảng, kiểu cũ) hoặc `platforms`
-(nhiều nền tảng, ưu tiên khi có):
-
-```json
-"platforms": ["facebook", "youtube"]
-```
-
-Khi đăng nhiều nền tảng, bản kê có `results` cho từng nền tảng (`status`,
-`post_id`, `post_url`, `deduplicated`, `published_at`). `status` chung là
-`published` (tất cả xong), `partial` (một phần lỗi) hoặc `failed`. Các trường
-`post_id` / `post_url` ở cấp ngoài giữ nghĩa cũ: phản ánh nền tảng đầu tiên.
-Nền tảng lỗi không chặn nền tảng còn lại; bản kê vẫn được ghi để lần chạy sau
-chỉ đăng phần còn thiếu.
-
-### Facebook Page
-
-1. Tạo Meta app và một Facebook Page.
-2. Cấp các quyền `pages_show_list`, `pages_read_engagement`,
-   `pages_manage_posts` cho user token.
-3. Điền `PAGE_ID` và `PAGE_ACCESS_TOKEN` vào `.env` (tên biến phải khớp
-   `page_id_env` / `access_token_env` trong `Config/publish.json`).
-4. Đổi `"mode"` trong `Config/publish.json` thành `"publish"` và để
-   `"platform": "facebook"` (hoặc `"platforms": ["facebook"]`).
-
-`PAGE_ACCESS_TOKEN` có thể là **user token**: user token đọc được Page nhưng
-Facebook trả lỗi `#210 A page access token is required` khi đăng video. Service
-tự đổi user token thành Page access token một lần (cần quyền
-`pages_show_list`) rồi mới upload. Nếu muốn dùng Page token dựng sẵn, đặt thêm
-`"page_token_env": "TÊN_BIẾN"` trong `facebook` của `Config/publish.json`.
-
-Bài đăng Facebook gồm: mô tả gốc của bài (`des`) + hashtag + dòng
-`Nguồn: <source_url>`.
-
-### YouTube
-
-YouTube dùng YouTube Data API v3 (`videos.insert` + resumable upload) và OAuth2
-**refresh token** (không dán access token tay mỗi lần).
-
-1. Tạo project Google Cloud, bật **YouTube Data API v3**.
-2. Tạo OAuth client loại **Desktop app**, tải file JSON về
-   `yt-secret/client_secret.json` (thư mục này đã nằm trong `.gitignore`).
-3. **Chạy một lần** trên máy có trình duyệt để lấy refresh token:
-
-   ```powershell
-   python youtube_auth.py
-   ```
-
-   Script mở trình duyệt, xin quyền `youtube.upload` + `youtube.readonly`, rồi
-   ghi `yt-secret/token.json` và cập nhật `YT_CLIENT_ID`, `YT_CLIENT_SECRET`,
-   `YT_REFRESH_TOKEN` trong `.env`. Không cần tự dán token.
-
-   - Máy không có trình duyệt: `python youtube_auth.py --no-browser` rồi dán
-     URL in ra vào trình duyệt.
-   - Đã có token nhưng muốn cấp lại: `python youtube_auth.py --force`.
-   - Chỉ ghi token file, không sửa `.env`: `--no-env`.
-4. Bật YouTube: `"platforms": ["youtube"]` hoặc `["facebook", "youtube"]`,
-   rồi đặt `"mode": "publish"`.
-
-Nếu `YT_REFRESH_TOKEN` trống (hoặc không giống token Google), service đọc refresh
-token từ `youtube.token_file` (mặc định `yt-secret/token.json`) do script trên
-tạo.
-
-Cấu hình trong khối `youtube`:
-
-| Khoá | Ý nghĩa |
-| --- | --- |
-| `privacy_status` | `unlisted` (mặc định), `public`, `private` |
-| `category_id` | Mã danh mục YouTube; `25` = News & Politics |
-| `check_existing` | Tra video cùng tiêu đề trên kênh trước khi đăng |
-| `self_declared_made_for_kids` | Khai báo nội dung dành cho trẻ em |
-| `token_file` | File refresh token dự phòng khi env trống |
-| `max_file_bytes` | Giới hạn file (mặc định 256 GB) |
-| `timeout_seconds` | Timeout mỗi request upload |
-
-
-Video dùng chung tiêu đề/mô tả/hashtag của pipeline. Hashtag được bỏ dấu `#`
-thành `tags`; tiêu đề cắt ở 100 ký tự, mô tả cắt ở 5000 ký tự, tổng `tags` tối
-đa 500 ký tự (giới hạn của YouTube).
-
-Lưu ý quota: `check_existing` gọi `search.list` (100 đơn vị quota/lần, hạn mức
-mặc định 10.000/ngày). Chạy nhiều bài/ngày thì có thể tắt.
-
-Upload không được retry trong cùng một lần chạy (tránh tạo video trùng khi phản
-hồi bị mất). Nếu lỗi giữa đường, chạy lại pipeline: bước `publish` tự tra tiêu
-đề trước khi đăng lại.
-
-### YouTube Shorts (video dọc)
-
-YouTube **không có cờ hay endpoint riêng cho Shorts**. Video được tự phân loại
-là Short khi có khung **vuông hoặc dọc** và **dài tối đa 3 phút** (áp dụng cho
-video đăng từ 15/10/2024). `#Shorts` chỉ là mẹo, không bắt buộc.
-
-Pipeline hiện xuất video **1080x1920 (9:16)** nên mọi video mới (≤ 3 phút) sẽ
-thành Short, không cần sửa gì ở bước `publish`:
-
-| Nơi cấu hình | Giá trị |
-| --- | --- |
-| `Config/render.json` | `"width": 1080`, `"height": 1920` |
-| `Config/Image/models.json` | `options.width = 1080`, `options.height = 1920` |
-
-Prompt lập kế hoạch ảnh tự nhận khung hình từ `render.json` (qua `main.py`) và
-được dặn bố cục dọc, nên không cần sửa prompt tay.
-
-Bàn tay cầm bút tự thu nhỏ theo chiều rộng khung (mặc định `width / 1920`) để
-không phình to khi chuyển sang 9:16. Có thể ghi đè bằng `hand_scale` trong
-`render.json` nếu muốn tay to/nhỏ hơn.
-
-Muốn quay lại video ngang 16:9, đổi cả hai file về `1920x1080`. Đổi khung hình
-làm trạng thái `render` cũ mất hiệu lực và các clip được render lại.
-
-Video đã render trước khi đổi cấu hình vẫn là file ngang — đăng lên sẽ nằm ở
-dạng video thường, không phải Short. Video dài quá 3 phút cũng vẫn là video
-thường dù có khung dọc.
-
-### Chế độ
-
-Các chế độ: `"prepare"` (ghi bản kê), `"publish"` (đăng thật), `"off"` (tắt hẳn).
-
-Đổi `mode` hoặc danh sách nền tảng làm thay đổi "dấu vân tay" đầu vào của bước,
-nên state cũ sẽ tự động chạy lại bước `publish` (không đăng trùng nhờ tra tiêu đề
-đã có).
-
-## Test
+Test:
 
 ```powershell
 python -m pytest
 ```
 
-Test không gọi mạng: LLM, RSS, TTS, ảnh và API mạng xã hội đều được giả lập.
+## Model & nền tảng
+
+| Thành phần | Mô hình / nhà cung cấp | Cấu hình |
+| --- | --- | --- |
+| LLM viết bài | Gemini (`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3.8-flash`), Gemma-4-31B-it (fallback), Ollama `llama3.1:8b` | `Config/LLM/models.json` |
+| TTS đọc bài | edge-tts (`vi-VN-HoaiMyNeural`) hoặc Google TTS | `Config/tts.json` |
+| Sinh ảnh | Flux qua Pollinations | `Config/Image/models.json` |
+| Render video | WhiteBoardEngine (hand-drawn whiteboard) | `Config/render.json` |
+
+Mặc định video xuất ra **1080×1920 (9:16)** — phù hợp YouTube Shorts. Muốn quay lại 16:9, đổi `render.json` về `1920×1080`.
+
+## Cấu hình (`Config/`)
+
+- `rss.json`: danh sách feed tin tức.
+- `pipeline.json`: retry, workflow, trạng thái job.
+- `Agents/*.json`: model + prompt cho từng agent (writer, checker, selector, image_planner).
+- `Image/*.json`: model ảnh và provider.
+- `render.json`: engine whiteboard, fps, `width`/`height`, thời lượng mỗi cảnh.
+- `media.json`: thư mục video cuối, sai số thời lượng.
+- `publish.json`: nền tảng, chế độ đăng.
+
+## Đăng YouTube
+
+Mặc định `"mode": "prepare"` chỉ ghi bản kê `output/publish/<article_id>.json`, không đăng thật. Để đăng:
+
+```json
+"platforms": ["youtube"],
+"mode": "publish"
+```
+
+1. Tạo project Google Cloud, bật **YouTube Data API v3**.
+2. Tạo OAuth client **Desktop app**, lưu `yt-secret/client_secret.json`.
+3. Chạy `python youtube_auth.py` một lần để lấy refresh token (ghi `yt-secret/token.json` + cập nhật `.env`).
+4. Khối `youtube` trong `publish.json`: `privacy_status` (`public`/`unlisted`/`private`), `category_id` (25 = News), `check_existing`, ...
+
+YouTube không có cờ riêng cho Shorts: video **dọc/vuông ≤ 3 phút** sẽ tự được xếp vào Shorts. Không retry upload trong 1 lần chạy (tránh video trùng); nếu lỗi, chạy lại pipeline, bước publish sẽ tra tiêu đề trước khi đăng lại.
