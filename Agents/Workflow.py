@@ -233,7 +233,12 @@ class Workflow:
 
             if self.render_service and result.get("images"):
                 stage = "render"
-                render_fingerprint = _digest(images_fingerprint)
+                render_fingerprint = _digest(
+                    images_fingerprint,
+                    getattr(self.render_service, "width", None),
+                    getattr(self.render_service, "height", None),
+                    getattr(self.render_service, "hand_scale", None),
+                )
                 render_stage = self._run_or_reuse(
                     article_id, "render",
                     lambda: self._produce_clips(

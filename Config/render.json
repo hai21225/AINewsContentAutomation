@@ -3,5 +3,7 @@
     "output_dir": "output/clips",
     "duration_seconds": 5.0,
     "fps": 24,
+    "width": 1080,
+    "height": 1920,
     "timeout_seconds": 1800
 }

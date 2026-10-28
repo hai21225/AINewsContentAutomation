@@ -3,8 +3,8 @@
         "provider": "pollinations",
         "model": "flux",
         "options": {
-            "width": 1920,
-            "height": 1080,
+            "width": 1080,
+            "height": 1920,
             "seed": 42,
             "timeout": 180
         },

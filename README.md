@@ -69,7 +69,7 @@ Mọi cấu hình nằm trong `Config/`:
 | `tts.json` | Provider TTS và voice |
 | `Agents/*.json` | Model + prompt cho từng agent |
 | `Image/*.json` | Model sinh ảnh và provider |
-| `render.json` | Engine whiteboard, fps, thời lượng mỗi cảnh |
+| `render.json` | Engine whiteboard, fps, khung hình (width/height), thời lượng mỗi cảnh |
 | `media.json` | Thư mục video cuối, sai số thời lượng |
 | `publish.json` | Nền tảng, chế độ và thông tin đăng bài |
 
@@ -164,6 +164,34 @@ mặc định 10.000/ngày). Chạy nhiều bài/ngày thì có thể tắt.
 Upload không được retry trong cùng một lần chạy (tránh tạo video trùng khi phản
 hồi bị mất). Nếu lỗi giữa đường, chạy lại pipeline: bước `publish` tự tra tiêu
 đề trước khi đăng lại.
+
+### YouTube Shorts (video dọc)
+
+YouTube **không có cờ hay endpoint riêng cho Shorts**. Video được tự phân loại
+là Short khi có khung **vuông hoặc dọc** và **dài tối đa 3 phút** (áp dụng cho
+video đăng từ 15/10/2024). `#Shorts` chỉ là mẹo, không bắt buộc.
+
+Pipeline hiện xuất video **1080x1920 (9:16)** nên mọi video mới (≤ 3 phút) sẽ
+thành Short, không cần sửa gì ở bước `publish`:
+
+| Nơi cấu hình | Giá trị |
+| --- | --- |
+| `Config/render.json` | `"width": 1080`, `"height": 1920` |
+| `Config/Image/models.json` | `options.width = 1080`, `options.height = 1920` |
+
+Prompt lập kế hoạch ảnh tự nhận khung hình từ `render.json` (qua `main.py`) và
+được dặn bố cục dọc, nên không cần sửa prompt tay.
+
+Bàn tay cầm bút tự thu nhỏ theo chiều rộng khung (mặc định `width / 1920`) để
+không phình to khi chuyển sang 9:16. Có thể ghi đè bằng `hand_scale` trong
+`render.json` nếu muốn tay to/nhỏ hơn.
+
+Muốn quay lại video ngang 16:9, đổi cả hai file về `1920x1080`. Đổi khung hình
+làm trạng thái `render` cũ mất hiệu lực và các clip được render lại.
+
+Video đã render trước khi đổi cấu hình vẫn là file ngang — đăng lên sẽ nằm ở
+dạng video thường, không phải Short. Video dài quá 3 phút cũng vẫn là video
+thường dù có khung dọc.
 
 ### Chế độ
 

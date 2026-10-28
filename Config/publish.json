@@ -1,5 +1,5 @@
 {
-    "platform": "facebook",
+    "platform": ["facebook", "youtube"],
 
     "mode": "publish",
 

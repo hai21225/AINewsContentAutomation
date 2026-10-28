@@ -1,3 +1,5 @@
+import re
+
 from Agents.BaseAgent import BaseAgent
 from Errors import ConfigurationError, ValidationError
 
@@ -63,6 +65,7 @@ IMAGE_PLAN_OUTPUT_FORMAT = {
 
 ALLOWED_TRANSITIONS = ("draw", "cut", "fade")
 DEFAULT_DURATION_TOLERANCE_SECONDS = 0.5
+CANVAS_PATTERN = re.compile(r"^\s*(\d{2,5})\s*[x×]\s*(\d{2,5})\s*$")
 
 
 class ImagePlannerAgent(BaseAgent):
@@ -89,6 +92,7 @@ class ImagePlannerAgent(BaseAgent):
                 "duration_tolerance_seconds", DEFAULT_DURATION_TOLERANCE_SECONDS
             )
         )
+        self._canvas = self._parse_canvas(config.get("canvas"))
 
         if self._min_images < 1:
             raise ConfigurationError("min_images phải lớn hơn hoặc bằng 1.")
@@ -106,6 +110,10 @@ class ImagePlannerAgent(BaseAgent):
     @property
     def duration_tolerance(self):
         return self._duration_tolerance
+
+    @property
+    def canvas(self):
+        return self._canvas
 
     def run(self, article, tts_text, tts_duration):
         self._validate_inputs(article, tts_text, tts_duration)
@@ -131,7 +139,7 @@ class ImagePlannerAgent(BaseAgent):
             GIỚI HẠN SỐ ẢNH:
             - Số ảnh tối thiểu: {self._min_images}
             - Số ảnh tối đa: {self._max_images}
-
+{self._framing_instruction()}
             YÊU CẦU BẮT BUỘC:
             1. Chia toàn bộ kịch bản thành các cảnh theo đúng trình tự.
             2. Mỗi cảnh phải minh họa một ý chính của lời đọc tương ứng.
@@ -252,6 +260,68 @@ class ImagePlannerAgent(BaseAgent):
             changes.append("total_duration_seconds")
 
         return changes
+
+    @staticmethod
+    def _parse_canvas(value):
+        """Đọc khung hình dạng ``"1080x1920"`` hoặc ``{width, height}``."""
+        if value is None:
+            return None
+
+        if isinstance(value, dict):
+            try:
+                width = int(value.get("width"))
+                height = int(value.get("height"))
+            except (TypeError, ValueError):
+                raise ConfigurationError(
+                    "canvas.width/height phải là số nguyên dương."
+                ) from None
+        elif isinstance(value, str):
+            match = CANVAS_PATTERN.match(value)
+
+            if not match:
+                raise ConfigurationError(
+                    "canvas phải có dạng 'WIDTHxHEIGHT', ví dụ '1080x1920'."
+                )
+
+            width, height = int(match.group(1)), int(match.group(2))
+        else:
+            raise ConfigurationError(
+                "canvas phải là chuỗi 'WIDTHxHEIGHT' hoặc object width/height."
+            )
+
+        if width < 2 or height < 2:
+            raise ConfigurationError("canvas.width/height phải lớn hơn hoặc bằng 2.")
+
+        return width - width % 2, height - height % 2
+
+    def _framing_instruction(self):
+        """Hướng dẫn bố cục ảnh theo đúng khung hình sẽ render."""
+        if self._canvas is None:
+            return ""
+
+        width, height = self._canvas
+
+        if height > width:
+            shape = "khung dọc (portrait)"
+            guidance = (
+                "Chủ thể chính đặt giữa khung và chiếm phần lớn chiều cao; "
+                "tránh bố cục ngang rộng và tránh chi tiết nhỏ sát hai mép."
+            )
+        elif width > height:
+            shape = "khung ngang (landscape)"
+            guidance = (
+                "Chủ thể chính đặt giữa khung; tránh bố cục quá cao hoặc "
+                "chi tiết nhỏ sát mép trên/dưới."
+            )
+        else:
+            shape = "khung vuông"
+            guidance = "Chủ thể chính đặt giữa khung với bố cục cân đối."
+
+        return (
+            f"\n            BỐ CỤC KHUNG HÌNH (bắt buộc):\n"
+            f"            - Ảnh được render vào {shape} {width}x{height} px.\n"
+            f"            - {guidance}\n"
+        )
 
     @staticmethod
     def _validate_inputs(article, tts_text, tts_duration):

@@ -251,3 +251,48 @@ def test_invalid_image_limits_raise_configuration_error():
 
     with pytest.raises(ConfigurationError):
         build_agent([], config)
+
+
+def test_vertical_canvas_adds_portrait_framing(article):
+    agent, client = build_agent([plan()], {**CONFIG, "canvas": "1080x1920"})
+
+    agent.run(article, "Kịch bản.", 9.0)
+
+    prompt = client.calls[0]["prompt"]
+    assert "1080x1920" in prompt
+    assert "khung dọc" in prompt
+    assert "chiếm phần lớn chiều cao" in prompt
+    assert agent.canvas == (1080, 1920)
+
+
+def test_horizontal_canvas_adds_landscape_framing(article):
+    agent, client = build_agent([plan()], {**CONFIG, "canvas": "1920x1080"})
+
+    agent.run(article, "Kịch bản.", 9.0)
+
+    prompt = client.calls[0]["prompt"]
+    assert "1920x1080" in prompt
+    assert "khung ngang" in prompt
+
+
+def test_canvas_accepts_width_height_object(article):
+    config = {**CONFIG, "canvas": {"width": 1080, "height": 1920}}
+
+    agent, _ = build_agent([plan()], config)
+
+    assert agent.canvas == (1080, 1920)
+
+
+def test_canvas_is_optional(article):
+    agent, client = build_agent([plan()])
+
+    agent.run(article, "Kịch bản.", 9.0)
+
+    assert agent.canvas is None
+    assert "BỐ CỤC KHUNG HÌNH" not in client.calls[0]["prompt"]
+
+
+@pytest.mark.parametrize("canvas", ["1080", "ngang", "0x1920", 1080, {}])
+def test_invalid_canvas_raises_configuration_error(canvas):
+    with pytest.raises(ConfigurationError):
+        build_agent([], {**CONFIG, "canvas": canvas})

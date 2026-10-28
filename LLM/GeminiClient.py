@@ -230,7 +230,8 @@ class GeminiClient(BaseLlmClient):
 
     def _generate_with_model(self, model, prompt, output_format):
         config_args = {
-            "temperature": self._options.get("temperature", 0.2)
+            "temperature": self._options.get("temperature", 0.2),
+            "automatic_function_calling": types.AutomaticFunctionCallingConfig(disable=True),
         }
 
         if output_format is not None:

@@ -76,6 +76,79 @@ def test_command_is_the_mandated_render_image_command(tmp_path):
     assert command[8] == "24"
 
 
+def test_canvas_comes_from_config(tmp_path):
+    service, calls = build_service(tmp_path, width=1080, height=1920)
+
+    service.render_clip(make_image(tmp_path), tmp_path / "out.mp4")
+
+    command = calls[0]
+    assert command[command.index("--width") + 1] == "1080"
+    assert command[command.index("--height") + 1] == "1920"
+    assert (service.width, service.height) == (1080, 1920)
+
+
+def test_default_canvas_is_landscape(tmp_path):
+    service, calls = build_service(tmp_path)
+
+    service.render_clip(make_image(tmp_path), tmp_path / "out.mp4")
+
+    command = calls[0]
+    assert command[command.index("--width") + 1] == "1920"
+    assert command[command.index("--height") + 1] == "1080"
+
+
+def test_canvas_can_be_overridden_per_call(tmp_path):
+    service, calls = build_service(tmp_path, width=1080, height=1920)
+
+    service.render_clip(
+        make_image(tmp_path), tmp_path / "out.mp4", width=1920, height=1080
+    )
+
+    command = calls[0]
+    assert command[command.index("--width") + 1] == "1920"
+    assert command[command.index("--height") + 1] == "1080"
+
+
+def test_odd_canvas_is_floored_to_even(tmp_path):
+    service, _ = build_service(tmp_path, width=1081, height=1921)
+
+    assert (service.width, service.height) == (1080, 1920)
+
+
+def test_hand_scale_follows_canvas_width(tmp_path):
+    service, calls = build_service(tmp_path, width=1080, height=1920)
+
+    service.render_clip(make_image(tmp_path), tmp_path / "out.mp4")
+
+    command = calls[0]
+    assert service.hand_scale == pytest.approx(1080 / 1920)
+    assert float(command[command.index("--hand-scale") + 1]) == pytest.approx(
+        1080 / 1920
+    )
+
+
+def test_hand_scale_can_be_configured(tmp_path):
+    service, calls = build_service(
+        tmp_path, width=1080, height=1920, hand_scale=0.75
+    )
+
+    service.render_clip(make_image(tmp_path), tmp_path / "out.mp4")
+
+    assert service.hand_scale == pytest.approx(0.75)
+    assert calls[0][calls[0].index("--hand-scale") + 1] == "0.75"
+
+
+def test_invalid_hand_scale_raises_configuration_error(tmp_path):
+    with pytest.raises(ConfigurationError):
+        build_service(tmp_path, hand_scale=0)
+
+
+@pytest.mark.parametrize("value", [0, -2, "abc", True, None])
+def test_invalid_canvas_raises_configuration_error(tmp_path, value):
+    with pytest.raises(ConfigurationError):
+        build_service(tmp_path, width=value)
+
+
 def test_render_photo_is_never_used(tmp_path):
     service, calls = build_service(tmp_path)
 

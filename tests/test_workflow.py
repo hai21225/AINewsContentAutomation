@@ -112,9 +112,11 @@ class StubImageService:
 
 
 class StubRenderService:
-    def __init__(self, failing=(), output_dir=None):
+    def __init__(self, failing=(), output_dir=None, width=1920, height=1080):
         self.failing = set(failing)
         self.output_dir = Path(output_dir) if output_dir else None
+        self.width = width
+        self.height = height
         self.calls = []
 
     def run(self, article_id, images, image_plan=None):
@@ -630,6 +632,40 @@ def test_render_stage_is_reused_on_second_run(articles, tmp_path):
     # Clip còn trên đĩa nên bước "render" được dùng lại, không render lại.
     assert render_service.calls == ["id-1", "id-2", "id-3"]
     assert summary["completed"] == 3
+
+
+def test_canvas_change_makes_render_run_again(articles, tmp_path):
+    store = StateStore(tmp_path / "state.json")
+    landscape = StubRenderService(output_dir=tmp_path / "clips")
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=landscape,
+        state_store=store,
+    )
+
+    workflow.run({})
+    assert len(landscape.calls) == 3
+
+    portrait = StubRenderService(
+        output_dir=tmp_path / "clips", width=1080, height=1920
+    )
+
+    workflow = build_workflow(
+        articles,
+        tts_service=StubTts(),
+        image_planner_agent=StubPlanner(),
+        image_service=StubImageService(),
+        render_service=portrait,
+        state_store=store,
+    )
+    workflow.run({})
+
+    # Đổi khung hình (16:9 -> 9:16) phải render lại clip, không dùng lại clip cũ.
+    assert portrait.calls == ["id-1", "id-2", "id-3"]
 
 
 def test_missing_clip_makes_render_run_again(articles, tmp_path):

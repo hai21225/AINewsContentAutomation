@@ -121,6 +121,16 @@ def create_llm_client(agent_config, providers, models, log_service,
     )
 
 
+def _with_canvas(agent_config, render_config):
+    """Gắn khung hình render vào cấu hình agent để prompt bố cục ảnh khớp."""
+    try:
+        canvas = f"{int(render_config['width'])}x{int(render_config['height'])}"
+    except (KeyError, TypeError, ValueError):
+        return agent_config
+
+    return {**agent_config, "canvas": canvas}
+
+
 def build_components(loader, log_service, args):
     """Tạo toàn bộ thành phần pipeline từ cấu hình."""
     models = loader.get_models()
@@ -133,7 +143,10 @@ def build_components(loader, log_service, args):
     writer_config = loader.get_agent("writer")
     checker_config = loader.get_agent("checker")
     selector_config = loader.get_agent("selector")
-    image_planner_config = loader.get_agent("image_planner")
+    render_config = loader.get_render()
+    image_planner_config = _with_canvas(
+        loader.get_agent("image_planner"), render_config
+    )
     tts_config = loader.get_tts()
 
     writer_agent = WriterAgent(
@@ -199,7 +212,7 @@ def build_components(loader, log_service, args):
 
     if not args.no_render:
         render_service = RenderService(
-            loader.get_render(), log_service=log_service
+            render_config, log_service=log_service
         )
 
     media_service = None

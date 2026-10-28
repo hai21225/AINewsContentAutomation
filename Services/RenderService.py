@@ -15,7 +15,8 @@ Vì sao dùng ``render-image`` mà KHÔNG dùng ``render-photo``::
 
 Lệnh render bắt buộc có dạng::
 
-    whiteboard render-image <anh> -o <clip.mp4> --duration <giây> --fps <fps>
+    whiteboard render-image <anh> -o <clip.mp4> --duration <giây> --fps <fps> \\
+        --width <px> --height <px> --hand-scale <tỉ lệ>
 
 Engine luôn được chạy với ``cwd`` là ``engine_dir`` để nó tìm thấy tài nguyên
 tương đối của mình.
@@ -39,6 +40,16 @@ DEFAULT_OUTPUT_DIR = "output/clips"
 #: Mặc định lấy theo giá trị đã thử ở prototype của dự án (5 giây, 24 fps).
 DEFAULT_DURATION_SECONDS = 5.0
 DEFAULT_FPS = 24
+
+#: Khung hình mặc định: 16:9 ngang. Đặt 1080x1920 trong Config/render.json để
+#: có video dọc (YouTube Shorts / Reels).
+DEFAULT_WIDTH = 1920
+DEFAULT_HEIGHT = 1080
+
+#: Bàn tay cầm bút được engine scale theo cạnh nhỏ của khung, nên khung càng hẹp
+#: thì tay càng chiếm nhiều chiều ngang. Lấy tỉ lệ theo chiều rộng chuẩn 1920 để
+#: tay giữ đúng độ lớn tương đối khi đổi sang video dọc.
+HAND_SCALE_BASE_WIDTH = 1920
 
 #: Render một clip có thể mất vài phút; 0 = không giới hạn.
 DEFAULT_TIMEOUT_SECONDS = 1800
@@ -73,6 +84,13 @@ class RenderService:
             config.get("duration_seconds", DEFAULT_DURATION_SECONDS)
         )
         self._fps = int(config.get("fps", DEFAULT_FPS))
+        self._width = self._even_dimension(
+            config.get("width", DEFAULT_WIDTH), "width"
+        )
+        self._height = self._even_dimension(
+            config.get("height", DEFAULT_HEIGHT), "height"
+        )
+        self._hand_scale = self._resolve_hand_scale(config, self._width)
         self._timeout = float(
             config.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
         )
@@ -93,6 +111,18 @@ class RenderService:
     @property
     def output_dir(self):
         return self._output_dir
+
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def height(self):
+        return self._height
+
+    @property
+    def hand_scale(self):
+        return self._hand_scale
 
     def is_available(self):
         """True nếu CLI của engine đã sẵn sàng để gọi."""
@@ -130,11 +160,12 @@ class RenderService:
     # Dựng clip
     # ------------------------------------------------------------------
 
-    def render_clip(self, image_path, output_path, duration=None, fps=None):
+    def render_clip(self, image_path, output_path, duration=None, fps=None,
+                    width=None, height=None, hand_scale=None):
         """Dựng một clip từ một ảnh, trả về đường dẫn clip.
 
         Lệnh gọi engine là cố định: ``render-image`` (xem docstring module),
-        kèm ``--duration``/``--fps``.
+        kèm ``--duration``/``--fps``/``--width``/``--height``/``--hand-scale``.
 
         Engine được chạy với ``cwd = engine_dir`` nên MỌI đường dẫn truyền cho
         nó phải là tuyệt đối; nếu để tương đối, engine sẽ resolve theo thư mục
@@ -165,6 +196,12 @@ class RenderService:
             str(duration if duration is not None else self._default_duration),
             "--fps",
             str(fps if fps is not None else self._fps),
+            "--width",
+            str(width if width is not None else self._width),
+            "--height",
+            str(height if height is not None else self._height),
+            "--hand-scale",
+            str(hand_scale if hand_scale is not None else self._hand_scale),
         ]
 
         self._log_info(
@@ -292,6 +329,51 @@ class RenderService:
         executable = "whiteboard.exe" if os.name == "nt" else "whiteboard"
 
         return self._engine_dir / ".venv" / scripts_dir / executable
+
+    @staticmethod
+    def _even_dimension(value, name):
+        """Kích thước video phải là số chẵn (H.264 yêu cầu); làm tròn xuống."""
+        if isinstance(value, bool):
+            raise ConfigurationError(f"render.{name} phải là số nguyên dương.")
+
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            raise ConfigurationError(
+                f"render.{name} phải là số nguyên dương."
+            ) from None
+
+        if number < 2:
+            raise ConfigurationError(
+                f"render.{name} phải lớn hơn hoặc bằng 2."
+            )
+
+        return number - number % 2
+
+    @staticmethod
+    def _resolve_hand_scale(config, width):
+        """Tỉ lệ bàn tay: mặc định theo chiều rộng, có thể ghi đè trong config."""
+        value = config.get("hand_scale")
+
+        if value is None:
+            return max(0.1, width / HAND_SCALE_BASE_WIDTH)
+
+        if isinstance(value, bool):
+            raise ConfigurationError(
+                "render.hand_scale phải là số dương."
+            )
+
+        try:
+            scale = float(value)
+        except (TypeError, ValueError):
+            raise ConfigurationError(
+                "render.hand_scale phải là số dương."
+            ) from None
+
+        if scale <= 0:
+            raise ConfigurationError("render.hand_scale phải là số dương.")
+
+        return max(0.1, scale)
 
     def _record_failure(self, article_id, scene_id, message, results):
         self._log_error(
