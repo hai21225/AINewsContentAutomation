@@ -187,8 +187,16 @@ class StubPublishService:
         self.calls = []
 
     def run(self, article_id, video_path, title=None, hashtags=None,
-            description=None, duration_seconds=None):
+            description=None, duration_seconds=None, source_url=None):
         self.calls.append(article_id)
+        self.last_call = {
+            "article_id": article_id,
+            "title": title,
+            "hashtags": hashtags,
+            "description": description,
+            "source_url": source_url,
+            "duration_seconds": duration_seconds,
+        }
 
         if article_id in self.failing:
             raise MediaError("facebook lỗi")
@@ -889,6 +897,17 @@ def test_publish_stage_records_manifest(articles, tmp_path):
     assert publish.calls == ["id-1"]
 
 
+def test_publish_receives_article_description_and_source(articles, tmp_path):
+    publish = StubPublishService(output_dir=tmp_path / "publish")
+    workflow = publish_workflow(articles, tmp_path, publish, article_limit=1)
+
+    workflow.run({})
+
+    assert publish.last_call["description"] == "Mô tả ngắn của bài kiểm thử."
+    assert publish.last_call["source_url"] == "https://example.com/bai-viet"
+    assert publish.last_call["title"] == "Bài 1"
+
+
 def test_publish_stage_skipped_without_service(articles):
     workflow = build_workflow(
         articles,
@@ -953,3 +972,28 @@ def test_publish_stage_is_reused_until_mode_changes(articles, tmp_path):
     assert publish.calls == ["id-1", "id-1"]
     assert summary["results"][0]["publish"]["status"] == "published"
     assert summary["results"][0]["publish"]["post_id"] == "999_1"
+
+
+def test_publish_result_requires_every_platform_to_succeed():
+    from Agents.Workflow import _has_publish_result
+
+    stage = {
+        "output": {
+            "status": "partial",
+            "results": {
+                "facebook": {"status": "published", "post_id": "fb-1"},
+                "youtube": {"status": "failed", "post_id": None},
+            },
+        }
+    }
+
+    # Một nền tảng lỗi -> chưa xong, lần chạy sau phải đăng tiếp.
+    assert _has_publish_result(stage) is False
+
+    stage["output"]["status"] = "published"
+    stage["output"]["results"]["youtube"] = {
+        "status": "published",
+        "post_id": "yt-1",
+    }
+
+    assert _has_publish_result(stage) is True

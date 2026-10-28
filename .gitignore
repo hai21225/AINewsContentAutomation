@@ -237,3 +237,5 @@ Lib/WhiteBoardEngine/whiteboard-video-engine/test_output/
 # Working prototype kept as a reference for the real engine CLI (it uses
 # `render-photo`, which needs lineart model weights this repo does not ship).
 Lib/WhiteBoardEngine/whiteboard-video-engine/test_engine_video.py
+
+yt-secret/

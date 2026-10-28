@@ -88,6 +88,10 @@ class FakeSession:
         self.requests.append({"method": "POST", "url": url, **kwargs})
         return self._next()
 
+    def put(self, url, **kwargs):
+        self.requests.append({"method": "PUT", "url": url, **kwargs})
+        return self._next()
+
     def _next(self):
         if not self.results:
             raise AssertionError("FakeSession đã hết kết quả.")

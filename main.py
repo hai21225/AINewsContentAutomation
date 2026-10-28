@@ -311,7 +311,7 @@ def describe_plan(components, loader, args):
             credential_state = "không cần (prepare)"
 
         Console.print(
-            f"Đăng bài         : {publish_service.platform} "
+            f"Đăng bài         : {', '.join(publish_service.platforms)} "
             f"(chế độ: {publish_service.mode}, "
             f"credential: {credential_state})"
         )

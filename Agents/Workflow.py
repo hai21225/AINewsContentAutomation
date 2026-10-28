@@ -268,11 +268,13 @@ class Workflow:
                     _file_fingerprint(video.get("video_path")),
                     content.get("title"),
                     content.get("hashtags"),
+                    article.get("des"),
+                    article.get("source_url"),
                 )
                 publish_stage = self._run_or_reuse(
                     article_id, "publish",
                     lambda: self._publish_video(
-                        article_id, video, content
+                        article_id, video, content, article
                     ),
                     validate=_has_publish_result,
                     fingerprint=publish_fingerprint,
@@ -432,12 +434,14 @@ class Workflow:
         }
         return video, [video["video_path"]], metadata
 
-    def _publish_video(self, article_id, video, content):
+    def _publish_video(self, article_id, video, content, article):
         result = self.publish_service.run(
             article_id,
             video["video_path"],
             title=content.get("title"),
             hashtags=content.get("hashtags"),
+            description=article.get("des"),
+            source_url=article.get("source_url"),
             duration_seconds=video.get("duration_seconds"),
         )
         metadata = {
@@ -603,7 +607,12 @@ def _has_video(stage):
 
 
 def _has_publish_result(stage):
-    """Chỉ coi là xong khi có bản kê; 'published' thì BẮT BUỘC có post_id."""
+    """Chỉ coi là xong khi có bản kê; 'published' thì BẮT BUỘC có post_id.
+
+    Khi đăng nhiều nền tảng, mọi nền tảng trong ``results`` đều phải có
+    ``post_id``; trạng thái ``partial`` (một nền tảng lỗi) không được coi là
+    xong để lần chạy sau đăng tiếp nền tảng còn thiếu.
+    """
     output = stage.get("output")
 
     if not isinstance(output, dict):
@@ -614,10 +623,20 @@ def _has_publish_result(stage):
     if status == "prepared":
         return True
 
-    if status == "published":
-        return bool(output.get("post_id"))
+    if status != "published":
+        return False
 
-    return False
+    results = output.get("results")
+
+    if isinstance(results, dict) and results:
+        return all(
+            isinstance(result, dict)
+            and result.get("status") == "published"
+            and result.get("post_id")
+            for result in results.values()
+        )
+
+    return bool(output.get("post_id"))
 
 
 def _is_positive_number(stage):

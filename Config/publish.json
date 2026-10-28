@@ -1,7 +1,7 @@
 {
     "platform": "facebook",
 
-    "mode": "prepare",
+    "mode": "publish",
 
     "output_dir": "output/publish",
 
@@ -9,11 +9,27 @@
         "api_version": "v26.0",
         "graph_url": "https://graph.facebook.com",
         "graph_video_url": "https://graph-video.facebook.com",
-        "page_id_env": "FB_PAGE_ID",
-        "access_token_env": "FB_PAGE_ACCESS_TOKEN",
+        "page_id_env": "PAGE_ID",
+        "access_token_env": "PAGE_ACCESS_TOKEN",
         "published": true,
         "check_existing": true,
         "max_file_bytes": 1073741824,
+        "timeout_seconds": 600
+    },
+
+    "youtube": {
+        "client_id_env": "YT_CLIENT_ID",
+        "client_secret_env": "YT_CLIENT_SECRET",
+        "refresh_token_env": "YT_REFRESH_TOKEN",
+        "token_file": "yt-secret/token.json",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "api_url": "https://www.googleapis.com/youtube/v3",
+        "upload_url": "https://www.googleapis.com/upload/youtube/v3/videos",
+        "privacy_status": "public",
+        "category_id": "25",
+        "self_declared_made_for_kids": false,
+        "check_existing": true,
+        "max_file_bytes": 274877906944,
         "timeout_seconds": 600
     }
 }

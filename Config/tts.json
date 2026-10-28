@@ -1,7 +1,6 @@
 {
     "provider": "edge_tts",
     "output_dir": "outputmp3",
-
     "providers": {
         "edge_tts": {
             "voice": "vi-VN-HoaiMyNeural",
